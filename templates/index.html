@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ableton Organizer</title>
+</head>
+<body>
+
+
+{% macro trackInfo(t, track_id, depth) %}
+    <tr class="trackInfo_{{ track_id }}">
+        {% for i in range(depth) %}
+            <td>
+            </td>
+        {% endfor %}
+        <td>
+        {{ t["name"]["EffectiveName"]["Value"] }} ID {{ track_id }}
+        </td>
+    </tr>
+
+{% endmacro %}
+
+<table>
+    {% for t in tracks recursive %}
+        {{- trackInfo(t, loop.index, loop.depth) }}
+        {%- if t["sub_tracks"] %}
+          <tr>
+            {{ loop(t["sub_tracks"])}}
+          </tr>
+        {%- endif %}
+    {% endfor %}
+
+
+
+</table>
+
+</body>
+</html>

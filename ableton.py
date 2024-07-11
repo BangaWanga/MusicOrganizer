@@ -91,6 +91,16 @@ class Ableton_Project:
     @staticmethod
     def get_next_by_tag(node: ET.ElementTree, tag: str):
         return next(node.iter(tag))
+    @staticmethod
+    def resolve_node_to_dict(node):
+        r = {}
+        for n in node:
+            if "Value" in n.attrib:
+                print(n.tag)
+                r[n.tag] = n.attrib
+            else:
+                r[n.tag] = Ableton_Project.resolve_node_to_dict(n)
+        return r
 
     @staticmethod
     def get_tracks(root):
@@ -101,24 +111,41 @@ class Ableton_Project:
             track_type = t.tag
             group_id = next(t.iter("TrackGroupId")).attrib["Value"]
             name = {n.tag: n.attrib for n in next(t.iter("Name"))}
-            plug_ins = [i.attrib["Value"] for i in t.iter("PlugName") ]
+            plug_ins = [i.attrib["Value"] for i in t.iter("PlugName")]
+            if [i for i in t.iter("PlugName")]:
+                print("Say WHat ", [i for i in t.iter("PlugName")])
+            audio_input_routing = Ableton_Project.resolve_node_to_dict(next(t.iter("AudioInputRouting")))
+            audio_output_routing = Ableton_Project.resolve_node_to_dict(next(t.iter("AudioOutputRouting")))
+            midi_input_routing = Ableton_Project.resolve_node_to_dict(next(t.iter("MidiInputRouting")))
+            midi_output_routing = Ableton_Project.resolve_node_to_dict(next(t.iter("MidiOutputRouting")))
+            mixer = Ableton_Project.resolve_node_to_dict(next(t.iter("Mixer")))
+
+            device_info = []
+            for track_id, t in enumerate(track_nodes):
+                devices = list(t.iter("DeviceChain"))[1][0]
+                for device in devices:
+                    device_info.append({
+                        "name": device.tag
+                    })
+
             track_info = {
                     "type": track_type,
                     "track_id": t.attrib["Id"],
                     "group_id": group_id,
                     "name": name,
                     "sub_tracks": [],
-                    "PlugIns": plug_ins
+                    "PlugIns": plug_ins,
+                    "audio_output_routing": audio_output_routing,
+                    "midi_output_routing": midi_output_routing,
+                    "audio_input_routing": audio_input_routing,
+                    "midi_input_routing": midi_input_routing,
+                    "mixer": mixer
             }
-            print(group_id)
             if group_id == "-1":
                 tracks.append(track_info)
             else:
-                print("ELSE ", tracks)
                 def rec_grouper(child, parent):
-                    print("Rec Grouper", child["group_id"], parent["track_id"])
                     if child["group_id"] == parent["track_id"]:
-                        print("YOU BELONG TO ME ")
                         parent["sub_tracks"].append(child)
                     else:
                         parent["sub_tracks"] = [rec_grouper(child, p) for p in parent["sub_tracks"]]
@@ -127,15 +154,23 @@ class Ableton_Project:
 
         return tracks
 
+    # def validate_rhzmtq_set(self, path="tmp/RHZMTQ@Sisyphos 30.06.24 Project/RHZMTQ@Sisyphos 30.06.24.als"):
+
+
 def get_tracks_from_projectpath(path: str):
     example_project = Ableton_Project(pathlib.Path(path))
     tree = example_project.load_ableton_project(example_project.project_path)
     root = tree.getroot()
-    tree.write('tmp/test.xml')
+    # tree.write('tmp/test.xml')
     print(example_project)
     return example_project.get_tracks(root)
 
 
 if __name__=="__main__":
-    path = "C:/Users/Nicolas/PycharmProjects/MusicOrganizer/tmp/Ohre.als"
+    path = "tmp/RHZMTQ@Sisyphos 30.06.24 Project/RHZMTQ@Sisyphos 30.06.24.als"
+    # path = "C:/Users/Nicolas/PycharmProjects/MusicOrganizer/tmp/Ohre.als"
+    example_project = Ableton_Project(pathlib.Path(path))
+    tree = example_project.load_ableton_project(example_project.project_path)
+    root = tree.getroot()
+    #tree.write('tmp/test.xml')
     tracks = get_tracks_from_projectpath(path)

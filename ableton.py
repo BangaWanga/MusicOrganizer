@@ -154,23 +154,18 @@ class Ableton_Project:
 
         return tracks
 
-    # def validate_rhzmtq_set(self, path="tmp/RHZMTQ@Sisyphos 30.06.24 Project/RHZMTQ@Sisyphos 30.06.24.als"):
 
 
 def get_tracks_from_projectpath(path: str):
     example_project = Ableton_Project(pathlib.Path(path))
     tree = example_project.load_ableton_project(example_project.project_path)
     root = tree.getroot()
-    # tree.write('tmp/test.xml')
-    print(example_project)
     return example_project.get_tracks(root)
 
 
 if __name__=="__main__":
-    path = "tmp/RHZMTQ@Sisyphos 30.06.24 Project/RHZMTQ@Sisyphos 30.06.24.als"
-    # path = "C:/Users/Nicolas/PycharmProjects/MusicOrganizer/tmp/Ohre.als"
+    path = "bin/sisy21.als"
     example_project = Ableton_Project(pathlib.Path(path))
     tree = example_project.load_ableton_project(example_project.project_path)
     root = tree.getroot()
-    #tree.write('tmp/test.xml')
     tracks = get_tracks_from_projectpath(path)

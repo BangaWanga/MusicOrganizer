@@ -6,5 +6,3 @@ def init_dir(path_str: str):
     for directory in Path(path).glob('**'):
         for item in directory.iterdir():
             print(item)
-
-

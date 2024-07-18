@@ -38,6 +38,8 @@ class Ableton_Project:
         self.exports: list[pathlib.Path] = []
         self.project_files: list[pathlib.Path] = []
         self.tmp_path = "tmp"
+        self.tree = None
+        self.root = None
         self.init_dirs()
         self.scan_project_dir()
 
@@ -60,6 +62,9 @@ class Ableton_Project:
     def scan_export_dir(self, keywords: list[str]):
         raise NotImplemented
 
+    def load(self):
+        self.load_ableton_project(self.project_path)
+        return self.tree
     def load_ableton_project(self, path: pathlib.Path):
         # copy .als file, extract it and read
         import shutil
@@ -77,7 +82,8 @@ class Ableton_Project:
             with open(tmp_path_extract, 'w') as ff:
                 s = str(file_content)[2:-1].replace("'" , '"').replace("<?" , "<").replace("?>" , ">") + "</xml>"
                 ff.write(s)
-        return ET.parse(tmp_path_extract)
+        self.tree = ET.parse(tmp_path_extract)
+        self.root = self.tree.getroot()
 
     @staticmethod
     def iter_print(node, depth=0):
@@ -92,10 +98,12 @@ class Ableton_Project:
     def get_next_by_tag(node: ET.ElementTree, tag: str):
         return next(node.iter(tag))
 
-    @staticmethod
-    def get_tracks(root):
+    def get_tracks(self):
+        return next(self.root.iter("Tracks"))
+
+    def build_json_object(self):
         tracks = []
-        track_nodes = next(root.iter("Tracks"))
+        track_nodes = self.get_tracks()
         group_ids = [next(t.iter("TrackGroupId")) for t in track_nodes]
         for t in track_nodes:
             track_type = t.tag
@@ -127,15 +135,16 @@ class Ableton_Project:
 
         return tracks
 
-def get_tracks_from_projectpath(path: str):
+
+def how_to_work_with_the_script(path: str):
     example_project = Ableton_Project(pathlib.Path(path))
-    tree = example_project.load_ableton_project(example_project.project_path)
-    root = tree.getroot()
+    tree = example_project.load()
+    root = example_project.tree.getroot()
     tree.write('tmp/test.xml')
     print(example_project)
-    return example_project.get_tracks(root)
+    return example_project.build_json_object()
 
 
 if __name__=="__main__":
     path = "C:/Users/Nicolas/PycharmProjects/MusicOrganizer/tmp/Ohre.als"
-    tracks = get_tracks_from_projectpath(path)
+    tracks = how_to_work_with_the_script(path)

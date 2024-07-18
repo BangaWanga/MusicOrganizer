@@ -6,7 +6,7 @@ app = Flask(__name__)
 @app.route('/')
 def hello_world():  # put application's code here
     # path = "tmp/ZugSkizze.als
-    path = "tmp/RHZMTQ@Sisyphos 30.06.24 Project/RHZMTQ@Sisyphos 30.06.24.als"
+    path = "bin/sisy21.als"
     tracks = get_tracks_from_projectpath(path)
     for t in tracks:
         print(t)

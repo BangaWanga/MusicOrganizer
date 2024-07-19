@@ -26,10 +26,33 @@ class TrackType(enum.Enum):
 
 
 @dataclasses.dataclass
-class Track:
+class Track_Type:
     name: dict
     group_id: str
     track_type: str
+
+
+class Track:
+    @staticmethod
+    def plug_ins(track) -> list[str]:
+        return [i.attrib["Value"] for i in track.iter("PlugName") ]
+
+    @staticmethod
+    def track_type(track):
+        return track.tag
+
+    @staticmethod
+    def group_id(track):
+        """
+        Returns IDs for all Ableton-groups
+        :return:
+        :rtype:
+        """
+        return next(track.iter("TrackGroupId")).attrib["Value"]
+
+    @staticmethod
+    def name(track) -> dict:
+        return {n.tag: n.attrib for n in next(track.iter("Name"))}
 
 
 class Ableton_Project:
@@ -101,15 +124,22 @@ class Ableton_Project:
     def get_tracks(self):
         return next(self.root.iter("Tracks"))
 
+    @staticmethod
+    def get_group_id_from_track(track: ET.Element):
+        """
+        Returns IDs for all Ableton-groups
+        :return:
+        :rtype:
+        """
+        return next(track.iter("TrackGroupId")).attrib["Value"]
     def build_json_object(self):
         tracks = []
         track_nodes = self.get_tracks()
-        group_ids = [next(t.iter("TrackGroupId")) for t in track_nodes]
         for t in track_nodes:
-            track_type = t.tag
-            group_id = next(t.iter("TrackGroupId")).attrib["Value"]
-            name = {n.tag: n.attrib for n in next(t.iter("Name"))}
-            plug_ins = [i.attrib["Value"] for i in t.iter("PlugName") ]
+            track_type = Track.track_type(t)
+            group_id = Track.group_id(t) # self.get_group_id_from_track(t)
+            name = Track.name(t) # {n.tag: n.attrib for n in next(t.iter("Name"))}
+            plug_ins = Track.plug_ins(t)
             track_info = {
                     "type": track_type,
                     "track_id": t.attrib["Id"],
@@ -118,21 +148,16 @@ class Ableton_Project:
                     "sub_tracks": [],
                     "PlugIns": plug_ins
             }
-            print(group_id)
             if group_id == "-1":
                 tracks.append(track_info)
             else:
-                print("ELSE ", tracks)
                 def rec_grouper(child, parent):
-                    print("Rec Grouper", child["group_id"], parent["track_id"])
                     if child["group_id"] == parent["track_id"]:
-                        print("YOU BELONG TO ME ")
                         parent["sub_tracks"].append(child)
                     else:
                         parent["sub_tracks"] = [rec_grouper(child, p) for p in parent["sub_tracks"]]
                     return parent
                 tracks = [rec_grouper(track_info, t) for t in tracks]
-
         return tracks
 
 

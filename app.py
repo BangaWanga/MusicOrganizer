@@ -3,6 +3,9 @@ from ableton import how_to_work_with_the_script
 app = Flask(__name__)
 
 
+@app.route('/test')
+def test():
+    return render_template("vuetest.html")
 @app.route('/')
 def hello_world():  # put application's code here
     tracks = how_to_work_with_the_script("C:/Users/Nicolas/PycharmProjects/MusicOrganizer/tmp/Ohre.als")

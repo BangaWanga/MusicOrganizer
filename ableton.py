@@ -64,11 +64,11 @@ class Ableton_Project:
         # copy .als file, extract it and read
         import shutil
         tmp_path = pathlib.Path(TMP_DIR).joinpath(
-            str(path.stem) + "-tmp" + ".gz"   #str(path.stem)[-len(path.suffix):]
+            str(path.stem) + "-tmp" + ".gz"
         )
 
         tmp_path_extract = pathlib.Path(TMP_DIR).joinpath(
-            str(path.stem) + "_tmp_extract_.xml" # + str(path.stem)[-len(path.suffix):]
+            str(path.stem) + "_tmp_extract_.xml"
         )
         shutil.copyfile(path, tmp_path)
 
@@ -91,12 +91,12 @@ class Ableton_Project:
     @staticmethod
     def get_next_by_tag(node: ET.ElementTree, tag: str):
         return next(node.iter(tag))
+    
     @staticmethod
     def resolve_node_to_dict(node):
         r = {}
         for n in node:
             if "Value" in n.attrib:
-                print(n.tag)
                 r[n.tag] = n.attrib
             else:
                 r[n.tag] = Ableton_Project.resolve_node_to_dict(n)
@@ -164,7 +164,8 @@ def get_tracks_from_projectpath(path: str):
 
 
 if __name__=="__main__":
-    path = "bin/sisy21.als"
+    dirname = os.path.dirname(__file__)
+    path = os.path.join(dirname, "bin/sisy21.als")
     example_project = Ableton_Project(pathlib.Path(path))
     tree = example_project.load_ableton_project(example_project.project_path)
     root = tree.getroot()

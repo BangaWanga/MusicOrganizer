@@ -64,7 +64,8 @@ class Ableton_Project:
         self.tree = None
         self.root = None
         self.init_dirs()
-        self.scan_project_dir()
+        # self.scan_project_dir()
+        self.load_ableton_project(project_path)
 
     def init_dirs(self):
         if not os.path.exists(TMP_DIR):

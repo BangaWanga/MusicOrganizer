@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ableton Organizer</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+
+</head>
+<body>
+
+<style>
+.GroupTrack{
+    background-color: chocolate;
+}
+.MidiTrack{
+    background-color: antiquewhite;
+}
+.AudioTrack{
+    background-color: firebrick;
+}
+
+
+</style>
+{% macro trackInfo(t, track_id, depth) %}
+    <tr>
+        {% for i in range(depth) %}
+            <td>
+            </td>
+        {% endfor %}
+        <td class="{{t["type"] }}">
+        {{ t["name"]["EffectiveName"]["Value"] }} ID {{ track_id }}
+        </td>
+    </tr>
+
+{% endmacro %}
+
+<table>
+    {% for t in tracks recursive %}
+        {{- trackInfo(t, loop.index, loop.depth) }}
+        {%- if t["sub_tracks"] %}
+          <tr>
+            {{ loop(t["sub_tracks"])}}
+          </tr>
+        {%- endif %}
+    {% endfor %}
+
+
+
+</table>
+
+
+<div id="app">Message: {{ message }}</div>
+</div>
+
+<script>
+const { createApp, ref } = Vue
+createApp({
+    setup() {
+      const message = ref('Hello vue!')
+      return {
+        message
+      }
+    }
+  }).mount('#app')
+</script>
+
+</body>
+</html>

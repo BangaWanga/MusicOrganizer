@@ -7,8 +7,8 @@ from flask_cors import CORS, cross_origin
 app = Flask(__name__)
 
 Cors = CORS(app)
-# CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS = True)
-CORS(app, resources={r'/*': {'origins': '*'}})
+CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS = True)
+#CORS(app, resources={r'/*': {'origins': '*'}})
 
 app.config['CORS_HEADERS'] = 'Content-Type'
 ableton_projects: list[Ableton_Project] = []
@@ -22,15 +22,18 @@ def test():
     return render_template("vuetest.html")
 
 
-@app.route("/get_project", methods=["GET"])
-def get_project():
-    headers = {
-        'Content-type': 'application/json' ,
-        'Accept': 'application/json'
-    }
-    response_object = {'status': 'success'}
+def parse_str(it):
+    return [str(i) for i in it]
+
+
+@app.route("/get_projects", methods=["GET"])
+@cross_origin(supports_credentials=True)
+def get_projects():
+
+    response_object = {'status': 'success', "projects": [parse_str(project_paths)]}
     print("WOOP")
-    return jsonify(response_object)
+    return response_object
+
 
 def load_projects():
     print("LOading Projects")

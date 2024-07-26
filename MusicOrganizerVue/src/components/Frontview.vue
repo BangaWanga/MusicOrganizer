@@ -32,20 +32,46 @@ export default{
 	},
     methods:{
         submit:function(){
-            const path = 'http://127.0.0.1:5000/get_project';
+            const path = 'http://localhost:5000/get_project';
             console.log("SUBMIT");
-            axios.get(path,
-                      {
-                          project_id :0,
-                          //department:this.dataentry.department,
+            // axios.defaults.headers.common['Authorization'] = 'AUTH TOKEN';
+            // axios.defaults.headers.post['Content-Type'] = 'application/json';
+            // axios.defaults.headers.post['crossDomain'] = true;
+            // axios.defaults.headers.post['dataType'] = "json";
+            // axios.defaults.headers.post['xhrFields'] = {"withCredentials": true};
+            axios.get(path, {
+                headers: {
+                    type: "GET",
+                    xhrFields: {
+                        withCredentials: true
+                    },
+                    crossDomain: true,
+                    contentType: 'application/json; charset=utf-8'
+                }
                       }).then(response => {
-                          console.log(response)
-                      }).catch(err =>{console.log(err)
-                      })
+                                      console.log(response)
+                                  }).catch(err =>{console.log(err)
+                                  })
         },
     }
 }
+
+
+/* for get-request:
+
+$.ajaxSetup({
+    type: "POST",
+    data: {},
+    dataType: 'json',
+    xhrFields: {
+       withCredentials: true
+    },
+    crossDomain: true,
+    contentType: 'application/json; charset=utf-8'
+});
+ */
 </script>
+
 
 
 <style>

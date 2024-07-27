@@ -55,6 +55,41 @@ class Track:
         return {n.tag: n.attrib for n in next(track.iter("Name"))}
 
 
+@dataclasses.dataclass
+class Track_Info:
+    type: str
+    track_id: str
+    group_id: str
+    name: str
+    sub_tracks: list
+    PlugIns: str
+    is_toggled: bool
+    depth: int
+
+
+    def get_row_data(self, exclude_fields: tuple = ("sub_tracks" ,)):
+        base_dict = self.__dict__.copy() # [self.type, self.track_id, self.name["EffectiveName"]["Value"], str(self.PlugIns), self.is_toggled]
+        headers = self.get_headers()
+        base_dict["name"] = base_dict["name"]["EffectiveName"]["Value"]
+        for field in exclude_fields:
+            if field in self.__dict__:
+                del base_dict[field]
+        return base_dict
+
+    def get_table_data(self):
+
+        tdata = [self.get_row_data()]
+        for st in self.sub_tracks:
+            st_data = st.get_table_data()
+            tdata.extend(st_data)
+
+        return tdata
+
+    @staticmethod
+    def get_headers():
+        return ["name", "type", "track_id", "PlugIns", "group_id", "depth"]
+
+
 class Ableton_Project:
     def __init__(self, project_path: pathlib.Path):
         self.project_path = project_path
@@ -89,6 +124,7 @@ class Ableton_Project:
     def load(self):
         self.load_ableton_project(self.project_path)
         return self.tree
+
     def load_ableton_project(self, path: pathlib.Path):
         # copy .als file, extract it and read
         import shutil
@@ -133,6 +169,48 @@ class Ableton_Project:
         :rtype:
         """
         return next(track.iter("TrackGroupId")).attrib["Value"]
+
+    def get_table_headers(self):
+        return Track_Info.get_headers()
+    def generate_display_table(self):
+        tracks = self.get_track_objects()
+        table_data = []
+        for t in tracks:
+            for row in t.get_table_data():
+                table_data.append(row)
+        return table_data
+    def get_track_objects(self):
+        tracks = []
+        track_nodes = self.get_tracks()
+        for t in track_nodes:
+            track_type = Track.track_type(t)
+            group_id = Track.group_id(t)  # self.get_group_id_from_track(t)
+            name = Track.name(t)  # {n.tag: n.attrib for n in next(t.iter("Name"))}
+            plug_ins = Track.plug_ins(t)
+            track_info = Track_Info(
+                type=track_type ,
+                track_id=t.attrib["Id"],
+                group_id=group_id,
+                name=name,
+                sub_tracks=[],
+                PlugIns=plug_ins,
+                is_toggled= group_id == "-1",
+                depth=0
+            )
+            if group_id == "-1":
+                tracks.append(track_info)
+            else:
+                def rec_grouper(child, parent: Track_Info):
+                    if child.group_id == parent.track_id:
+                        child.depth = parent.depth + 1
+                        parent.sub_tracks.append(child)
+                    else:
+                        parent.sub_tracks = [rec_grouper(child, p, ) for p in parent.sub_tracks]
+                    return parent
+
+                tracks = [rec_grouper(track_info , t) for t in tracks]
+        return tracks
+
     def build_json_object(self):
         tracks = []
         track_nodes = self.get_tracks()

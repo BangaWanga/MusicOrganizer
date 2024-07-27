@@ -15,6 +15,12 @@ ableton_projects: list[Ableton_Project] = []
 project_paths: list[pathlib.Path] = get_project_paths()
 
 print(project_paths)
+def load_projects():
+    print("LOading Projects")
+    for path in project_paths:
+        ableton_projects.append(Ableton_Project(path))
+
+load_projects()
 
 
 @app.route('/test')
@@ -26,19 +32,30 @@ def parse_str(it):
     return [str(i) for i in it]
 
 
-@app.route("/get_projects", methods=["GET"])
+@app.route("/get_project_paths", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def get_projects():
 
     response_object = {'status': 'success', "projects": [parse_str(project_paths)]}
-    print("WOOP")
+    print("WOOP Quadrat")
     return response_object
 
 
-def load_projects():
-    print("LOading Projects")
-    for path in project_paths:
-        ableton_projects.append(Ableton_Project(path))
+@app.route("/get_project", methods=["POST"])
+@cross_origin(supports_credentials=True)
+def get_project():
+    print("DATA", request.json)
+    project_id = request.json["project_id"]
+    print("Project ID: ", project_id)
+    project = ableton_projects[int(project_id)]
+
+    response_object = {'status': 'success', "headers": project.get_table_headers(), "data": project.generate_display_table()}
+    print("WOOP")
+    for tr, idx in enumerate(project.generate_display_table()):
+        print(idx, tr)
+    return response_object
+
+
 
 
 @app.route('/')

@@ -5,3 +5,7 @@
 npm install --save vue-router
 npm install bootstrap-vue --save
 npm install axios --save
+
+
+When running: 
+Create a folder in project named "project_files" or change "PROJECT_FILES_PATH" variable in files.py

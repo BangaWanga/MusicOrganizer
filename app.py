@@ -2,7 +2,7 @@ import pathlib
 
 from flask import Flask, render_template, request, jsonify
 from ableton import how_to_work_with_the_script, Ableton_Project
-from files import get_project_paths, project_files_path
+from files import get_project_paths, PROJECT_FILES_PATH
 from flask_cors import CORS, cross_origin
 app = Flask(__name__)
 

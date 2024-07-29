@@ -1,12 +1,12 @@
 from pathlib import Path
 
 
-project_files_path = "project_files"
+PROJECT_FILES_PATH = "project_files"
 
 
 def get_project_paths():
     ret = []
-    for directory in Path(project_files_path).glob('**'):
+    for directory in Path(PROJECT_FILES_PATH).glob('**'):
         print(directory)
         for item in directory.iterdir():
             print(item)

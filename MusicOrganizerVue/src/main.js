@@ -2,18 +2,20 @@ import './assets/main.css'
 
 import { createApp } from 'vue'
 import App from './App.vue'
-
+import 'bootstrap/dist/css/bootstrap.min.css'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import Frontview from './components/Frontview.vue'
 import Projectview from './components/Projectview.vue'
 import AbletonProjectTable from './components/AbletonProjectTable.vue'
 //import HomeView from './Front.vue'
+import Systemview from "@/components/Systemview.vue";
 
 
 const routes = [
   { path: '/', component: AbletonProjectTable },
   { path: '/frontview', component: Frontview, prope: true },
   { path: '/project_view', component: Projectview, props: true  },
+  { path: '/systemview', component: Systemview, props: true  },
 ]
 
 const router = createRouter({

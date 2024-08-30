@@ -1,0 +1,5 @@
+Problem:
+    Searched item might be stored deep in db structure
+    + complex db structure
+    Example: One piece of information might be insignificant bc a credible source doubts that information
+    -> Has to be updated and all partnered pages need to be updated

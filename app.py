@@ -44,18 +44,13 @@ def get_projects():
 @app.route("/get_project", methods=["POST"])
 @cross_origin(supports_credentials=True)
 def get_project():
-    print("DATA", request.json)
     project_id = request.json["project_id"]
-    print("Project ID: ", project_id)
     project = ableton_projects[int(project_id)]
 
     response_object = {'status': 'success', "headers": project.get_table_headers(), "data": project.generate_display_table()}
-    print("WOOP")
     for tr, idx in enumerate(project.generate_display_table()):
         print(idx, tr)
     return response_object
-
-
 
 
 @app.route('/')
@@ -70,6 +65,16 @@ def project_view():
     print(project_id)
     project = ableton_projects[int(project_id)-1]
     return render_template("project_view.html", tracks=project.build_json_object())
+
+
+@app.route("/system")
+def system_view():
+    project_id = request.args.get('project_id')
+    print(project_id)
+    project = ableton_projects[int(project_id)-1]
+    return render_template("project_view.html", tracks=project.build_json_object())
+
+
 
 
 if __name__ == '__main__':

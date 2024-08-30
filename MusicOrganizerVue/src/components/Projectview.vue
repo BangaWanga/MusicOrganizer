@@ -113,7 +113,6 @@
             headers.value = resp.headers;
             data.value = resp.data;
             console.log("Received Data: ", headers.value, data.value)
-
           }else{
             set_project_check()
 
@@ -124,6 +123,7 @@
   onMounted(() => {
       resp = get_projects().then((data)=> {
           resp_resolved = true;
+          console.log("Data: ", data)
           resp = data;
       })
       //project_paths = resp.projects

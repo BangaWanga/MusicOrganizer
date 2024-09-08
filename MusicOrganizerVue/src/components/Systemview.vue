@@ -130,7 +130,7 @@ onMounted(() => {
     })
     //project_paths = resp.projects
     //set_project_check()
-    init_canvas();
+    //init_canvas();
 
 })
 let component_click = function (idx_x, idx_y){

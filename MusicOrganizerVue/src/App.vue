@@ -18,6 +18,9 @@
 }
 #app {
   min-height: 100vh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
 }
 .routerView{
     margin-top: 8em;
@@ -26,10 +29,11 @@
 </style>
 
 <template>
-  <div id="app">
-    <div  class="d-flex flex-nowrap">
-      <div class="navbar d-flex flex-column flex-shrink-0 p-3 text-bg-dark" style="width: 280px">
-        <ul class="nav nav-pills nav-flush flex-column mb-auto text-center">
+  <div id="app" >
+
+      <div class="navbar flexbox d-flex flex-column flex-shrink-0 text-bg-dark" style="width: 280px; float: left;
+      margin-left: 0; margin-right: auto">
+        <ul class="nav nav-pills nav-flush flex-column text-center">
 
           <li class="nav-item">
               <RouterLink to="/" class='nav-link active py-3 border-bottom rounded-0" aria-current="page" data-bs-toggle="tooltip" data-bs-placement="right" aria-label="Home" data-bs-original-title="Home"'>Go to Home</RouterLink>
@@ -44,6 +48,7 @@
 
         </ul>
       </div>
+    <div  class="d-flex flex-nowrap">
 <!--
 <router-view />
 -->

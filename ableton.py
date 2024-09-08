@@ -60,14 +60,16 @@ class Track_Info:
     type: str
     track_id: str
     group_id: str
-    name: str
+    name: dict
     sub_tracks: list
-    PlugIns: str
+    PlugIns: list[str]
     is_toggled: bool
     depth: int
 
-
     def get_row_data(self, exclude_fields: tuple = ("sub_tracks" ,)):
+        # print("name: ", self.name)
+        print("plugIns: ", self.PlugIns)
+
         base_dict = self.__dict__.copy() # [self.type, self.track_id, self.name["EffectiveName"]["Value"], str(self.PlugIns), self.is_toggled]
         headers = self.get_headers()
         base_dict["name"] = base_dict["name"]["EffectiveName"]["Value"]
@@ -208,7 +210,7 @@ class Ableton_Project:
                         parent.sub_tracks = [rec_grouper(child, p, ) for p in parent.sub_tracks]
                     return parent
 
-                tracks = [rec_grouper(track_info , t) for t in tracks]
+                tracks = [rec_grouper(track_info, t) for t in tracks]
         return tracks
 
     def build_json_object(self):

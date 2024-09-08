@@ -1,17 +1,19 @@
 <style>
-    .GroupTrack{
-        background-color: chocolate;
-        margin: 1px;
+    .GroupTrack {
+        //background-color: chocolate;
+        //margin: 1px;
 
     }
-    .ExpandedGroupTrack{
-        background-color: #ffaa69;
+    .ExpandedGroupTrack {
+        //background-color: #ffaa69;
     }
-    .MidiTrack{
-        background-color: #4e4e43;
+    .MidiTrack {
+        //background-color: #4e4e43;
     }
-    .AudioTrack{
-        background-color: firebrick;
+    .AudioTrack {
+        //background-color: firebrick;
+    }
+    .Track{
     }
     .Track:hover{
       opacity: 0.5; //: 5px 5px lightblue inset;
@@ -24,46 +26,58 @@
 
 <template>
 
-  <table>
-      <tr>
-        <th
-          v-for="(header, i) in headers"
-          :key="`${header}${i}`"
-          class="header-item"
-        > {{ header }}
-        </th>
-      </tr>
-      <tbody>
+  <table class="table " >
+      <thead class="table-dark" >
+        <tr>
+          <th scope="col"
+            v-for="(header, i) in headers"
+            :key="`${header}${i}`"
+            class="header-item"
+          > {{ header }}
+          </th>
+        </tr>
+      </thead>
+
+      <tbody >
         <tr
           v-for="(trow, i) in data"
           v-show="trow['is_toggled']"
           :key="`row-${i}`"
-          v-bind:class="{GroupTrack: trow['type']==='GroupTrack', Track: true,              AudioTrack: trow['type']==='AudioTrack',
-              MidiTrack: trow['type']==='MidiTrack',              ExpandedGroupTrack: is_expanded(trow['track_id']),}"
+          v-bind:class="{'GroupTrack': trow['type']==='GroupTrack', Track: true, AudioTrack: trow['type']==='AudioTrack',
+              MidiTrack: trow['type']==='MidiTrack', ExpandedGroupTrack: is_expanded(trow['track_id']),
+              'table-info': trow['type']==='GroupTrack', 'table-active': trow['type']!=='GroupTrack'}"
           v-on:click="expand(trow['track_id'])"
+          class="bd-highlight"
         >
           <td
             v-for="(header, i) in headers"
             :key="`Dataipoint-${i}`">
 
-               <div v-if="header==='name'"  class="flex-container" v-bind:style="{'display': 'flex', 'flex-direction': 'row',   'align-content': 'stretch'}">
-                    <div class="flex-item depth-placeholder" v-for="i in trow['depth']" v-bind:style="{background: 'aliceblue', 'min-width': '10px', 'min-height': '5px'}"></div>
+               <div v-if="header==='name'"  v-bind:style="{'display': 'flex', 'flex-direction': 'row',   'align-content': 'stretch'}">
+                    <div class="flex-item depth-placeholder" v-for="i in trow['depth']"
+                         v-bind:style="{background: 'aliceblue', 'min-width': '10px', 'min-height': '5px'}"></div>
                     <div class="flex-item-data" style="margin-left: 10px">  {{trow['name']}}</div>
                </div>
-              <div class="grid-item" v-else style="float: right">{{ trow[header] }}</div>
+              <div class="grid-item" v-else style="float: left">{{ trow[header] }}</div>
 
 
           </td>
         </tr>
       </tbody>
     </table>
+
+
 </template>
+
+
 
 <script setup>
 
-
+  // ToDo (Bug): Make row invisible if parent is folded as well
   import {onMounted, ref } from "vue";
   import axios from "axios";
+  import 'bootstrap/dist/css/bootstrap.min.css'
+
   let headers = ref([])
   let data = ref([])
   let project_check = null
@@ -83,6 +97,7 @@
   let is_expanded = function (track_id){
       return expanded_groups.includes(track_id)
   }
+
   let expand = function (track_id){
       console.log("EXPAND ", track_id)
       let is_expanded = false;

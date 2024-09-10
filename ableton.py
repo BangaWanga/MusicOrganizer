@@ -2,6 +2,7 @@ import dataclasses
 import enum
 import os.path
 import pathlib
+import typing
 import xml.etree.ElementTree as ET
 import gzip
 
@@ -147,14 +148,56 @@ class Ableton_Project:
         self.tree = ET.parse(tmp_path_extract)
         self.root = self.tree.getroot()
 
+    def iter_print(self,
+                   search_list: typing.Optional[typing.Iterable] = None,
+                   exclude_list: typing.Iterable = ("ParameterList",),
+                   search_for_occurence: bool = False):
+        if exclude_list is None:
+            exclude_list = set()
+        if search_list is None:
+            search_list = set()
+        self._iter_print(self.root, 0, exclude_list,search_list, search_for_occurence)
+
     @staticmethod
-    def iter_print(node, depth=0):
+    def _iter_print(node, depth: int, exclude_list: typing.Iterable, search_list: typing.Iterable,
+                    search_for_occurence: bool):
         for i in node:
-            if i.tag == "ParameterList":
-                continue
+            if search_for_occurence:
+                if any([i.tag in sl for sl in search_list]) or any([i.tag in el for el in exclude_list]):
+                    continue
+            else:
+                if i.tag not in search_list or i.tag in exclude_list:
+                    continue
+
             print("\t\t" * depth, i.tag, i.attrib, depth)
             if len(i) > 0:
-                Ableton_Project.iter_print(i, depth + 1)
+                Ableton_Project._iter_print(i, depth + 1, search_list, exclude_list, search_for_occurence)
+    def rec_search(self,
+                   search_list: typing.Optional[typing.Iterable] = None,
+                   exclude_list: typing.Iterable = ("ParameterList",),
+                   search_for_occurence: bool = False):
+        if exclude_list is None:
+            exclude_list = set()
+        if search_list is None:
+            search_list = set()
+        return self._rec_search(self.root, 0, exclude_list, search_list, search_for_occurence)
+
+    @staticmethod
+    def _rec_search(node, depth: int, exclude_list: typing.Iterable, search_list: typing.Iterable,
+                    search_for_occurence: bool):
+        result = []
+        for i in node:
+            if search_for_occurence:
+                if any([i.tag in sl for sl in search_list]) or any([i.tag in el for el in exclude_list]):
+                    continue
+            else:
+                if i.tag not in search_list or i.tag in exclude_list:
+                    continue
+
+            result.append({"depth": depth, "i.tag": i.tag, "i.attrib": i.attrib,})
+            if len(i) > 0:
+                result += Ableton_Project._rec_search(i, depth + 1, exclude_list, search_list, search_for_occurence)
+        return result
 
     @staticmethod
     def get_next_by_tag(node: ET.ElementTree, tag: str):
@@ -252,5 +295,13 @@ def how_to_work_with_the_script(path: str):
 
 
 if __name__=="__main__":
-    path = "C:/Users/Nicolas/PycharmProjects/MusicOrganizer/tmp/Ohre.als"
-    tracks = how_to_work_with_the_script(path)
+    from files import get_project_paths
+    project_paths = get_project_paths()
+    if project_paths:
+
+        path = project_paths[0]
+        tracks = how_to_work_with_the_script(path)
+        ableton_project = Ableton_Project(pathlib.Path(path))
+        # Find tags in project with iter_print-method
+        ableton_project.iter_print(search_list=("Session", ), search_for_occurence=True)
+    print("No paths found")

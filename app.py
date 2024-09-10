@@ -32,6 +32,17 @@ def parse_str(it):
     return [str(i) for i in it]
 
 
+@app.route("/get_project_search", methods=["GET"])
+@cross_origin(supports_credentials=True)
+def get_project_search():
+    print("get_project_search ", request.args)
+    project_id = request.args.get('project_id', None)
+    if project_id is None:
+        return {'status': 'error, no project_id provided'}
+    project = ableton_projects[int(project_id)]
+    rows = project.rec_search(search_list=['Session'], search_for_occurence=True)
+    response_object = {'status': 'success', 'rows': rows[:100]}
+    return response_object
 @app.route("/get_project_paths", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def get_projects():

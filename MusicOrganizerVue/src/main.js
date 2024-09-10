@@ -6,6 +6,7 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import Frontview from './components/Frontview.vue'
 import Projectview from './components/Projectview.vue'
+import ProjectSearchView from './components/ProjectSearchView.vue'
 import AbletonProjectTable from './components/AbletonProjectTable.vue'
 //import HomeView from './Front.vue'
 import Systemview from "@/components/Systemview.vue";
@@ -15,6 +16,7 @@ const routes = [
   { path: '/', component: AbletonProjectTable },
   { path: '/frontview', component: Frontview, prope: true },
   { path: '/project_view', component: Projectview, props: true  },
+  { path: '/project_search_view', component: ProjectSearchView, props: true  },
   { path: '/systemview', component: Systemview, props: true  },
 ]
 

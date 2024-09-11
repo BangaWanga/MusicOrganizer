@@ -194,7 +194,7 @@ class Ableton_Project:
                 if i.tag not in search_list or i.tag in exclude_list:
                     continue
 
-            result.append({"depth": depth, "i.tag": i.tag, "i.attrib": i.attrib,})
+            result.append({"depth": depth, "tag": i.tag, "attrib": i.attrib,})
             if len(i) > 0:
                 result += Ableton_Project._rec_search(i, depth + 1, exclude_list, search_list, search_for_occurence)
         return result

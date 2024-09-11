@@ -1,5 +1,5 @@
 import pathlib
-
+import sys
 from flask import Flask, render_template, request, jsonify
 from ableton import how_to_work_with_the_script, Ableton_Project
 from files import get_project_paths, PROJECT_FILES_PATH
@@ -37,12 +37,21 @@ def parse_str(it):
 def get_project_search():
     print("get_project_search ", request.args)
     project_id = request.args.get('project_id', None)
+    seach_word = request.args.get('search_word', None)
+
     if project_id is None:
         return {'status': 'error, no project_id provided'}
+    search_words = {}
+    if seach_word:
+        search_words = {seach_word}
+        print("search_words ", search_words)
     project = ableton_projects[int(project_id)]
-    rows = project.rec_search(search_list=['Session'], search_for_occurence=True)
-    response_object = {'status': 'success', 'rows': rows[:100]}
+    rows = project.rec_search(search_list=search_words, search_for_occurence=True)
+    print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
+    response_object = {'status': 'success', 'rows': rows}
     return response_object
+
+
 @app.route("/get_project_paths", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def get_projects():

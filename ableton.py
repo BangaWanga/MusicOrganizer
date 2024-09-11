@@ -193,8 +193,17 @@ class Ableton_Project:
             else:
                 if i.tag not in search_list or i.tag in exclude_list:
                     continue
+            value = i.attrib
+            if "Value" in value:
+                value = value["Value"]
 
-            result.append({"depth": depth, "tag": i.tag, "attrib": i.attrib,})
+            # print(i.attrib, type(i.attrib))
+            if len(str(value)) > 200:
+                print("Wow ", len(value), value)
+            r = {"depth": depth, "tag": i.tag, }
+            if value:
+                r["value"] = value
+            result.append(r)
             if len(i) > 0:
                 result += Ableton_Project._rec_search(i, depth + 1, exclude_list, search_list, search_for_occurence)
         return result

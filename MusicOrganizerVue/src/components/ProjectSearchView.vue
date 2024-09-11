@@ -62,10 +62,14 @@
         <div class="" style="overflow: auto; flex-direction: row; height: 80%">
             <div v-for="(row, row_idx) in rows">
                 <div class="p-2" v-if="is_visible(row_idx)">
-                    <button @click="toggle_expand(row_idx);"
-                            :class="{'btn-light': isLeaf(row_idx), 'Expanded btn-info': is_expanded(row_idx),
-                        'Expandable': !isLeaf(row_idx) && !is_expanded(row_idx)}" :disabled="isLeaf(row_idx)"
-                    >{{ row_idx }} {{ row }}
+                    {{ "&nbsp;".repeat(row.depth * 3) }}
+                    <button @click="toggle_expand(row_idx);" :disabled="isLeaf(row_idx)">
+
+                        <span v-if="!isLeaf(row_idx) && !is_expanded(row_idx)">></span>
+                        <span v-if="is_expanded(row_idx)">⌄</span>
+                        {{ row.tag }}
+                        <span v-if="row.value">: {{ row.value }}</span>
+
                     </button>
                 </div>
             </div>
@@ -78,7 +82,7 @@
 <script setup>
 
   // ToDo (Bug): Make row invisible if parent is folded as well
-  import {onBeforeUpdate, onMounted, onUpdated, ref} from "vue";
+  import {onMounted, ref} from "vue";
   import axios from "axios";
   //import 'bootstrap/dist/css/bootstrap.min.css'
 

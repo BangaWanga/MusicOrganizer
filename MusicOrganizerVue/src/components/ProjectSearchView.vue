@@ -62,7 +62,7 @@
         <div class="" style="overflow: auto; flex-direction: row; height: 80%">
             <div v-for="(row, row_idx) in rows">
                 <div class="p-2" v-if="is_visible(row_idx)">
-                    <button @click="toggle_expand(row_idx)"
+                    <button @click="toggle_expand(row_idx);"
                             :class="{'btn-light': isLeaf(row_idx), 'Expanded btn-info': is_expanded(row_idx),
                         'Expandable': !isLeaf(row_idx) && !is_expanded(row_idx)}" :disabled="isLeaf(row_idx)"
                     >{{ row_idx }} {{ row }}
@@ -78,7 +78,7 @@
 <script setup>
 
   // ToDo (Bug): Make row invisible if parent is folded as well
-  import {onMounted, ref } from "vue";
+  import {onBeforeUpdate, onMounted, onUpdated, ref} from "vue";
   import axios from "axios";
   //import 'bootstrap/dist/css/bootstrap.min.css'
 
@@ -155,7 +155,7 @@
               // console.log("i ", i);
               if (get_depth(i) === get_depth(row_idx + 1)) {
                   visible_rows.value.push(i);
-              } else if (get_depth(i) < get_depth(row_idx)) {
+              } else if (get_depth(i) <= get_depth(row_idx)) {
                   //console.log(Array.from(expanded_rows.value), Array.from(visible_rows.value))
                   if (expansion_steps > 100) {
                       //const info_arr = [row_idx, expansion_steps];
@@ -189,8 +189,8 @@
   }
 
 
-  let update_projects = function (){
-      get_project_search(picked_project).then((data)=> {
+  let update_projects = function () {
+      get_project_search(picked_project).then((data) => {
           //project_search_response = data;
           //rows = ref([]);
           rows.value = data.rows;

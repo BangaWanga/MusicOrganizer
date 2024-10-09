@@ -98,7 +98,6 @@
   let search_word = "";
   const project_id = 0 // defineProps(['project_id'])
   let break_points = new Map()
-
   let is_expanded = function (row_idx) {
       return expanded_rows.value.includes(row_idx)
   }
@@ -178,6 +177,7 @@
 
           }
       }
+      console.log("Ran full loop for ", row_idx)
   }
   let get_template_areas = function(depth){
       let areas = ""

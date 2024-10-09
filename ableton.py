@@ -93,6 +93,51 @@ class Track_Info:
         return ["name", "type", "track_id", "PlugIns", "group_id", "depth"]
 
 
+class NestedTable:
+    def __init__(self, rows: list[dict[str, typing.Any]]):
+        self._rows = rows
+        self.expanded_rows = set()
+
+    def toggle_row(self, idx: int):
+        raise NotImplemented
+        if idx in self.expanded_rows:
+            self.expand_row(idx)
+
+    @property
+    def rows(self):
+        return self._rows
+
+    def expand_row(self, idx: int):
+        depth = self.rows[idx]["depth"]
+        splice_list = []    # start, delete_count, *insert_items
+        splice_start = idx + 1
+        step_skipped = False
+
+        def _splice_arg(added_row: dict, skipped: bool = False):
+            if skipped:
+                splice_list.append([splice_start, 0, added_row])
+            else:
+                splice_list[-1].append(added_row)
+
+        if splice_start >= len(self._rows):
+            return None
+
+        for row_idx in range(idx + 1, len(self._rows)):
+
+            row = self.rows[row_idx]
+            row_depth = row["depth"]
+            if row_depth == depth + 1:
+                _splice_arg(row, step_skipped)
+                step_skipped = False
+            elif row_depth <= depth:
+                break
+            elif row_depth > depth + 1:
+                step_skipped = True
+                splice_start = row_idx + 1
+        return splice_list
+
+
+
 class Ableton_Project:
     def __init__(self, project_path: pathlib.Path):
         self.project_path = project_path
@@ -172,6 +217,7 @@ class Ableton_Project:
             print("\t\t" * depth, i.tag, i.attrib, depth)
             if len(i) > 0:
                 Ableton_Project._iter_print(i, depth + 1, search_list, exclude_list, search_for_occurence)
+
     def rec_search(self,
                    search_list: typing.Optional[typing.Iterable] = None,
                    exclude_list: typing.Iterable = ("ParameterList",),

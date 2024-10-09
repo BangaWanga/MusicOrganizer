@@ -1,0 +1,33 @@
+<table>
+    <tr>
+        {% for header in headers %}
+            <th id="header_{{ header }}" class="header-item">
+                {{ header }}
+            </th>
+        {% endfor %}
+    </tr>
+
+    {{ row_group | safe }}
+</table>
+
+<style>
+
+    #value-col{
+        min-width: 50em;
+        max-width: 150em;
+    }
+
+    #tag-col{
+        min-width: 20em;
+        max-width: 20em;
+    }
+
+    #depth-col{
+        min-width: 5em;
+        max-width: 5em;
+    }
+
+    .table-col{
+        margin-left: 2em;
+    }
+</style>

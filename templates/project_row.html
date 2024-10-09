@@ -1,0 +1,22 @@
+<tr
+
+        class="table-rows chield_of_{{ row.idx }}
+            {% if row.is_expanded %}expanded-row
+            {% endif %}"
+        hx-get="/toggle_row?row={{ row.idx }}&project_id={{ project_id }}"
+
+        {% if row.idx == 0 %}
+            hx-target="#row_group_0"
+        {% else %}
+            hx-target="#row_group_{{ row.parent }}"
+        {% endif %}
+
+        {% if row.is_expanded or row.has_children%}
+            hx-trigger="click"
+            hx-swap="outerHTML"
+        {% endif %}
+>
+    <td id="depth-col" class="table-col"> {{ row.depth }} </td>
+    <td id="tag-col" class="table-col"> {{ row.tag }} </td>
+    <td id="value-col" class="table-col"> {{ row.value }} </td>
+</tr>

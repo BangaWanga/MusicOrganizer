@@ -6,6 +6,8 @@ import typing
 import xml.etree.ElementTree as ET
 import gzip
 
+import flask
+
 TMP_DIR = "tmp"
 
 
@@ -94,48 +96,100 @@ class Track_Info:
 
 
 class NestedTable:
-    def __init__(self, rows: list[dict[str, typing.Any]]):
+    def __init__(self, rows: list[dict[str, typing.Any]], project_id: int):
         self._rows = rows
         self.expanded_rows = set()
+        self.visible_rows = list()
+        self.init_rows()
+        self.project_id = project_id
+        self._new_rows = list()
 
-    def toggle_row(self, idx: int):
-        raise NotImplemented
+    def pop_new_rows(self):
+        tmp = self._new_rows
+        self._new_rows = list()
+        return tmp
+
+    def init_rows(self):
+        if not self._rows:
+            raise ValueError("No rows provided")
+        self._rows[0].update({"has_children": len(self._rows) > 1, })
+        for row_idx in range(len(self._rows)):
+            self._rows[row_idx].update({"idx": row_idx})
+
+    def build_new_row_group(self, group_idx: int, rows=None) -> str:
+        if not rows:
+            new_rows = self.pop_new_rows()
+            if not new_rows:
+                raise ValueError("No new rows available")
+            rows = new_rows
+        print(rows)
+        row_templates = [flask.render_template("project_row.html", row=row, project_id=self.project_id) for row in rows]
+        row_group = flask.render_template("table_level.html", idx=group_idx, rows=row_templates)
+        print("row_group:", row_group)
+        return row_group
+
+    def build_table_template(self) -> str:
+        if self.visible_rows:
+            rows = [self._rows[idx] for idx in sorted(self.visible_rows)]
+        else:
+            print("Project INIT")
+            # self.toggle_row(0)
+            self.visible_rows.append(0)
+            rows = [self._rows[0]]
+        row_group = 0
+        print(f"building template with {len(rows)} rows: ", rows)
+        row_group = self.build_new_row_group(row_group, rows)
+        template = flask.render_template("project_table.html", row_group=row_group)
+        # print(template)
+        return template
+
+    def toggle_row(self, idx: int) -> bool:
+        print("toggle row ", idx)
+        if not self.has_children(idx):
+            raise ValueError("Cant toggle row ", idx)
         if idx in self.expanded_rows:
+            self.collapse_row(idx)
+            return False
+        else:
             self.expand_row(idx)
+            return True
 
     @property
     def rows(self):
         return self._rows
 
+    @staticmethod
+    def is_chield_of(child, parent):
+        return child["depth"] == parent["depth"] + 1
+
+    def has_children(self, idx):
+        """
+        :return: bool = whether row has children
+        :rtype:
+        """
+        return len(self._rows) > idx + 1 and self.is_chield_of(self._rows[idx + 1], self._rows[idx])
+
     def expand_row(self, idx: int):
+        print("expand row ", idx)
         depth = self.rows[idx]["depth"]
-        splice_list = []    # start, delete_count, *insert_items
-        splice_start = idx + 1
-        step_skipped = False
-
-        def _splice_arg(added_row: dict, skipped: bool = False):
-            if skipped:
-                splice_list.append([splice_start, 0, added_row])
-            else:
-                splice_list[-1].append(added_row)
-
-        if splice_start >= len(self._rows):
-            return None
-
+        self.expanded_rows.add(idx)
+        self._rows[idx].update({"is_expanded": True})
+        self._new_rows.append(self._rows[idx])
         for row_idx in range(idx + 1, len(self._rows)):
-
             row = self.rows[row_idx]
             row_depth = row["depth"]
             if row_depth == depth + 1:
-                _splice_arg(row, step_skipped)
-                step_skipped = False
+                self.rows[row_idx].update({"parent": idx, "has_children": self.has_children(row_idx)})
+                self._new_rows.append(row)
             elif row_depth <= depth:
+                print(idx, row_idx, self.rows[row_idx])
                 break
-            elif row_depth > depth + 1:
-                step_skipped = True
-                splice_start = row_idx + 1
-        return splice_list
+        print(f"init table with {len(self._new_rows)} rows: {[row['idx'] for row in self._new_rows]}")
 
+    def collapse_row(self, idx: int):
+        print("Collapse row ", idx)
+        _idx = self.expanded_rows.remove(idx)
+        self._new_rows.append(self._rows[idx])
 
 
 class Ableton_Project:

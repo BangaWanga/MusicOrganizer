@@ -16,7 +16,7 @@ project_paths: list[pathlib.Path] = get_project_paths()
 nested_tables: dict[int, NestedTable] = dict()
 print(project_paths)
 
-
+current_table = None
 def load_projects():
     print("LOading Projects")
     for path in project_paths:
@@ -47,19 +47,49 @@ def project_search(search_word: str = None, project_id: int = None):
     return rows
 
 
+@app.route("/project_table", methods=["GET"])
+def project_table():
+    global nested_tables, current_table
+    project_id = request.args.get('project_id', None)
+    search_word = request.args.get('search_word', None)
+    if str(project_id).isnumeric():
+        project_id = int(project_id)
+    else:
+        raise ValueError(f"{project_id} is not a valid project_id")
+
+    if project_id in nested_tables and False:
+        nt: NestedTable = nested_tables[project_id]
+        current_table = project_id
+        return nt.build_table_template()
+
+    else:
+        rows = project_search(search_word, project_id)
+        nt = NestedTable(rows, project_id)
+        nested_tables[project_id] = nt
+        print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
+        current_table = project_id
+        return nt.build_table_template() # render_template("project_table.html", rows=rows[:1000])
+
+
 @app.route("/toggle_row", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def toggle_row():
-    row_idx = request.args.get('row_idx', None)
+    row_idx = request.args.get('row', None)
     project_id = request.args.get('project_id', None)
-    if str(row_idx).isnumeric() and str(project_id).isnumeric():
-        row_idx = int(row_idx)
-        project_id = int(project_id)
-        if 0 < project_id >= len(nested_tables):
-            raise ValueError(f"{project_id}: Index too small or too big for list with len {len(nested_tables)}")
-    else:
+    if not str(project_id).isnumeric() or (0 < int(project_id) >= len(nested_tables)):
+        raise ValueError(f"{project_id} is not a valid project-id for {len(nested_tables)} projects")
+    nt = nested_tables[int(project_id)]
+    if not str(row_idx).isnumeric() or (0 < int(row_idx) >= len(nt.rows)):
         raise ValueError(f"{row_idx} is not a valid row-idx")
-    return {"status": "success", "rows": nested_tables[row_idx]}
+
+    project_id = int(project_id)
+    row_idx = int(row_idx)
+    nt = nested_tables[project_id]
+    print("Before toggle row")
+    is_expanded = nt.toggle_row(row_idx)
+    row_group = nt.build_new_row_group(row_idx)
+    print(f"is_expanded: {is_expanded}. Added rows for row {row_idx}: {len(row_group)}", )
+    return row_group
 
 
 @app.route("/get_project_search", methods=["GET"])
@@ -74,7 +104,7 @@ def get_project_search():
         raise ValueError(f"{project_id} is not a valid project_id")
 
     rows = project_search(search_word, project_id)
-    nt = NestedTable(rows)
+    nt = NestedTable(rows, project_id)
     nested_tables[project_id] = nt
     print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
     response_object = {'status': 'success', "rows": rows}

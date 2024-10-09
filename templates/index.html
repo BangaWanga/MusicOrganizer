@@ -3,7 +3,9 @@
     <head>
         <meta charset="UTF-8">
         <title>Ableton Organizer</title>
-        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+        <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
+        <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
     </head>
 
     <body>
@@ -33,14 +35,14 @@
         </tr>
 
     {% endmacro %}
+    Hello World
 
-    <table>
+    <table id="project_table">
         {% for path in paths  %}
               <tr>
+                {% set url = url_for('project_table') + "?project_id=" + loop.index0|string %}
                 <td>
-                    <a href="{{ url_for('project_view') }}?project_id={{ loop.index }}">
-                        {{ url_for('project_view') }}?project_id={{ loop.index0 }}
-                    </a>
+                    <button hx-get="{{ url }}" hx-swap="outerHTML" hx-target="#project_table">{{ url }}</button>
                 </td>
               </tr>
         {% endfor %}

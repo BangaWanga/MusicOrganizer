@@ -9,7 +9,6 @@ import Projectview from './components/Projectview.vue'
 import ProjectSearchView from './components/ProjectSearchView.vue'
 import AbletonProjectTable from './components/AbletonProjectTable.vue'
 //import HomeView from './Front.vue'
-import Systemview from "@/components/Systemview.vue";
 
 
 const routes = [

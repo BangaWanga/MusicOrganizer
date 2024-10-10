@@ -1,5 +1,6 @@
-<tbody id="row_group_{{ idx }}">
+<div id="row_group_{{ idx }}"
+{% if idx > 0 %}  {% endif %} >
     {% for row in rows %}
         {{ row | safe }}
     {% endfor %}
-</tbody>
+</div>

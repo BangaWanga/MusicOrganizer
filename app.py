@@ -1,5 +1,7 @@
 import pathlib
 import sys
+
+import flask
 from flask import Flask, render_template, request, jsonify
 from ableton import how_to_work_with_the_script, Ableton_Project, NestedTable
 from files import get_project_paths, PROJECT_FILES_PATH
@@ -78,6 +80,8 @@ def toggle_row():
     project_id = request.args.get('project_id', None)
     if not str(project_id).isnumeric() or (0 < int(project_id) >= len(nested_tables)):
         raise ValueError(f"{project_id} is not a valid project-id for {len(nested_tables)} projects")
+    if int(project_id) not in nested_tables:
+        return flask.redirect(flask.url_for('.project_table', project_id=project_id))
     nt = nested_tables[int(project_id)]
     if not str(row_idx).isnumeric() or (0 < int(row_idx) >= len(nt.rows)):
         raise ValueError(f"{row_idx} is not a valid row-idx")

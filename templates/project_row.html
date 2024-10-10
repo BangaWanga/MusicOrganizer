@@ -1,14 +1,17 @@
-<tr
-
-        class="table-rows chield_of_{{ row.idx }}
+<div
+        id="row_{{ row.idx }}"
+        class="table-row
             {% if row.is_expanded %}expanded-row
+            {% elif row.has_children %}expandable-row
             {% endif %}"
         hx-get="/toggle_row?row={{ row.idx }}&project_id={{ project_id }}"
 
         {% if row.idx == 0 %}
             hx-target="#row_group_0"
-        {% else %}
-            hx-target="#row_group_{{ row.parent }}"
+        {% elif row.has_children and not row.is_expanded %}
+            hx-target="#row_{{ row.idx }}"
+        {% elif row.has_children and row.is_expanded %}
+            hx-target="#row_group_{{ row.idx }}"
         {% endif %}
 
         {% if row.is_expanded or row.has_children%}
@@ -16,7 +19,7 @@
             hx-swap="outerHTML"
         {% endif %}
 >
-    <td id="depth-col" class="table-col"> {{ row.depth }} </td>
-    <td id="tag-col" class="table-col"> {{ row.tag }} </td>
-    <td id="value-col" class="table-col"> {{ row.value }} </td>
-</tr>
+    <span id="depth-col" class="table-col depth-indicator-{{ row.depth }}"></span>
+    <span id="tag-col" class="table-col"> {{ row.tag }} </span>
+    <span id="value-col" class="table-col"> {{ row.value }} </span>
+</div>

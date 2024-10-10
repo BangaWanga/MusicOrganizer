@@ -35,19 +35,23 @@
         </tr>
 
     {% endmacro %}
-    Hello World
+    <h1>
+        Hello World
 
-    <table id="project_table">
-        {% for path in paths  %}
-              <tr>
-                {% set url = url_for('project_table') + "?project_id=" + loop.index0|string %}
-                <td>
-                    <button hx-get="{{ url }}" hx-swap="outerHTML" hx-target="#project_table">{{ url }}</button>
-                </td>
-              </tr>
-        {% endfor %}
-    </table>
+    </h1>
+    <p>
+        <table id="project_table">
+            {% for path in paths  %}
+                  <tr>
+                    {% set url = url_for('project_table') + "?project_id=" + loop.index0|string %}
+                    <td>
+                        <button hx-get="{{ url }}" hx-swap="outerHTML" hx-target="#project_table">{{ url }}</button>
+                    </td>
+                  </tr>
+            {% endfor %}
+        </table>
 
+    </p>
 
     </body>
 </html>

@@ -100,6 +100,7 @@ class NestedTable:
         self._rows = rows
         self.expanded_rows = set()
         self.visible_rows = list()
+        self.max_depth = 0
         self.init_rows()
         self.project_id = project_id
         self._new_rows = list()
@@ -115,6 +116,7 @@ class NestedTable:
         self._rows[0].update({"has_children": len(self._rows) > 1, })
         for row_idx in range(len(self._rows)):
             self._rows[row_idx].update({"idx": row_idx})
+            self.max_depth = max(self.max_depth, self._rows[row_idx]["depth"])
 
     def build_new_row_group(self, group_idx: int, rows=None) -> str:
         if not rows:
@@ -125,7 +127,7 @@ class NestedTable:
         print(rows)
         row_templates = [flask.render_template("project_row.html", row=row, project_id=self.project_id) for row in rows]
         row_group = flask.render_template("table_level.html", idx=group_idx, rows=row_templates)
-        print("row_group:", row_group)
+        #print("row_group:", row_group)
         return row_group
 
     def build_table_template(self) -> str:
@@ -139,7 +141,7 @@ class NestedTable:
         row_group = 0
         print(f"building template with {len(rows)} rows: ", rows)
         row_group = self.build_new_row_group(row_group, rows)
-        template = flask.render_template("project_table.html", row_group=row_group)
+        template = flask.render_template("project_table.html", row_group=row_group, max_depth=self.max_depth)
         # print(template)
         return template
 
@@ -181,15 +183,34 @@ class NestedTable:
             if row_depth == depth + 1:
                 self.rows[row_idx].update({"parent": idx, "has_children": self.has_children(row_idx)})
                 self._new_rows.append(row)
+                self.visible_rows.append(row_idx)
             elif row_depth <= depth:
                 print(idx, row_idx, self.rows[row_idx])
                 break
         print(f"init table with {len(self._new_rows)} rows: {[row['idx'] for row in self._new_rows]}")
 
-    def collapse_row(self, idx: int):
+    def collapse_row(self, idx: int, nested: bool = False):
         print("Collapse row ", idx)
-        _idx = self.expanded_rows.remove(idx)
-        self._new_rows.append(self._rows[idx])
+        self.expanded_rows.remove(idx)
+        if nested:
+            self.visible_rows.remove(idx)
+        self._rows[idx].update({"is_expanded": False})
+        depth = self._rows[idx]["depth"]
+        for row_idx in range(idx+1, len(self._rows)):   # ToDo: Only iterate over visible rows
+            if row_idx not in self.visible_rows:
+                continue
+            if self._rows[row_idx]["depth"] <= depth:
+                break
+            parent = self._rows[row_idx].get("parent", None)
+            print("collapse, ", idx, row_idx, parent, row_idx in self.expanded_rows, row_idx in self.visible_rows)
+            if parent is not None and parent == idx:
+                if row_idx in self.expanded_rows:
+                    self.collapse_row(row_idx, nested=True)
+                    # self.expanded_rows.remove(row_idx)
+                self.visible_rows.remove(row_idx)
+                self._rows[row_idx].update({"is_expanded": False})
+        if not nested:
+            self._new_rows.append(self._rows[idx])
 
 
 class Ableton_Project:

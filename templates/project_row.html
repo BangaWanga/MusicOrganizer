@@ -19,7 +19,14 @@
             hx-swap="outerHTML"
         {% endif %}
 >
+
+        {% if row.has_children and row.is_expanded %}
+            <span class="toggle-row-arrow">↑</span>
+        {% elif row.has_children and not row.is_expanded %}
+            <span class="toggle-row-arrow">↓</span>
+        {% endif %}
     <span id="depth-col" class="table-col depth-indicator-{{ row.depth }}"></span>
     <span id="tag-col" class="table-col"> {{ row.tag }} </span>
     <span id="value-col" class="table-col"> {{ row.value }} </span>
+
 </div>

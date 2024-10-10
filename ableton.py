@@ -190,23 +190,24 @@ class NestedTable:
         print(f"init table with {len(self._new_rows)} rows: {[row['idx'] for row in self._new_rows]}")
 
     def collapse_row(self, idx: int, nested: bool = False):
-        print("Collapse row ", idx)
+        print("Collapse row ", idx, nested, len(self.visible_rows))
         self.expanded_rows.remove(idx)
+        expanded_children = [row_idx for row_idx in self.expanded_rows if row_idx > 0 and
+                             self._rows[row_idx]["parent"] == idx]
+        for child_idx in expanded_children:
+            self.collapse_row(child_idx, nested=True)
         if nested:
             self.visible_rows.remove(idx)
         self._rows[idx].update({"is_expanded": False})
         depth = self._rows[idx]["depth"]
-        for row_idx in range(idx+1, len(self._rows)):   # ToDo: Only iterate over visible rows
-            if row_idx not in self.visible_rows:
-                continue
+        for row_idx in self.visible_rows:   # ToDo: Only iterate over visible rows
             if self._rows[row_idx]["depth"] <= depth:
                 break
             parent = self._rows[row_idx].get("parent", None)
-            print("collapse, ", idx, row_idx, parent, row_idx in self.expanded_rows, row_idx in self.visible_rows)
+            # print("collapse, ", idx, row_idx, parent, row_idx in self.expanded_rows, row_idx in self.visible_rows)
             if parent is not None and parent == idx:
-                if row_idx in self.expanded_rows:
-                    self.collapse_row(row_idx, nested=True)
-                    # self.expanded_rows.remove(row_idx)
+                if row_idx not in self.visible_rows:
+                    raise ValueError(f"{row_idx}: {self._rows[row_idx]} is not in visible rows. Nested:")
                 self.visible_rows.remove(row_idx)
                 self._rows[row_idx].update({"is_expanded": False})
         if not nested:

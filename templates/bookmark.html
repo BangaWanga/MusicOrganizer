@@ -1,0 +1,15 @@
+<script>
+
+</script>
+
+<li
+        title="Idx: {{ row.idx }} / Value: {{ value }} / "
+        id="bookmark_{{ row.idx }}{{ "_" + tag if tag else ""}}"
+        hx-on::beforeSwap="console.log('WORKS', this, event)"
+        onclick="setInfobox('<div> Row: {{ row.idx }} Tag: {{ tag }}<br>Value: {{ value }} </div>', 'bookmark_{{ row.idx }}{{ "_" + tag if tag else ""}}')"
+>
+    <span>
+        Row {{ row.idx }}{% if tag %}: {{ tag }}{% endif %}
+    </span>
+</li>
+<br>

@@ -1,11 +1,14 @@
 import pathlib
 import sys
+import typing
 
-import flask
-from flask import Flask, render_template, request, jsonify
-from ableton import how_to_work_with_the_script, Ableton_Project, NestedTable
 from files import get_project_paths, PROJECT_FILES_PATH
 from flask_cors import CORS, cross_origin
+import flask
+from flask import Flask, render_template, request, jsonify
+
+from ableton import how_to_work_with_the_script, Ableton_Project, NestedTable
+
 app = Flask(__name__)
 
 Cors = CORS(app)
@@ -16,11 +19,14 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 ableton_projects: list[Ableton_Project] = []
 project_paths: list[pathlib.Path] = get_project_paths()
 nested_tables: dict[int, NestedTable] = dict()
+bookmarks = set()
 print(project_paths)
 
-current_table = None
+current_table: typing.Optional[int] = None
+
+
 def load_projects():
-    print("LOading Projects")
+    print(f"Loading {len(project_paths)} .als files")
     for path in project_paths:
         ableton_projects.append(Ableton_Project(path))
 
@@ -37,21 +43,45 @@ def parse_str(it):
     return [str(i) for i in it]
 
 
-def project_search(search_word: str = None, project_id: int = None):
+def project_search(search_word: str = "", project_id: int = None):
     if project_id is None:
         return {'status': 'error, no project_id provided'}
-    search_words = {}
-    if search_word:
-        search_words = {search_word}
-        print("search_words ", search_words)
     project = ableton_projects[project_id]
-    rows = project.rec_search(search_list=search_words, search_for_occurence=True)
+    rows = project.rec_search(search_word=search_word, search_for_occurence=True)
     return rows
+
+
+@app.route("/bookmark", methods=["GET"])
+def bookmark():
+    tag = request.args.get('tag', None)
+    idx = request.args.get('idx', None)
+    global current_table, bookmarks
+    if idx in bookmarks or tag is not None and (idx, tag,) in bookmarks:
+        raise ValueError("Cant bookmark item again")
+    if tag is None:
+        bookmarks.add(idx)
+    else:
+        bookmarks.add((idx, tag,))
+    if current_table is None:
+        raise ValueError("Invalid current_table", current_table)
+    if str(idx).isnumeric():
+        idx = int(idx)
+    else:
+        raise ValueError(f"{idx} is not a valid row-index for bookmark with tag {tag}")
+
+    row = nested_tables[current_table].rows[idx]
+    value = row.get("value", None)
+    if value and tag:
+        value = value[tag]
+
+    return render_template("bookmark.html", tag=tag, row=row, value=value)
 
 
 @app.route("/project_table", methods=["GET"])
 def project_table():
-    global nested_tables, current_table
+
+    global nested_tables, current_table, bookmarks
+    bookmarks = set()
     project_id = request.args.get('project_id', None)
     search_word = request.args.get('search_word', None)
     if str(project_id).isnumeric():
@@ -59,7 +89,7 @@ def project_table():
     else:
         raise ValueError(f"{project_id} is not a valid project_id")
 
-    if project_id in nested_tables and False:
+    if project_id in nested_tables and False:   # Deactivated persistent projects. table gets rebuilt every time
         nt: NestedTable = nested_tables[project_id]
         current_table = project_id
         return nt.build_table_template()
@@ -70,7 +100,8 @@ def project_table():
         nested_tables[project_id] = nt
         print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
         current_table = project_id
-        return nt.build_table_template() # render_template("project_table.html", rows=rows[:1000])
+        _template = nt.build_table_template()
+        return _template # render_template("project_table.html", rows=rows[:1000])
 
 
 @app.route("/toggle_row", methods=["GET"])

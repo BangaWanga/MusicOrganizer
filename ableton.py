@@ -96,7 +96,7 @@ class Track_Info:
 
 
 class NestedTable:
-    def __init__(self, rows: list[dict[str, typing.Any]], project_id: int):
+    def __init__(self, rows: list[dict[str, typing.Any]], project_id: int, ):
         self._rows = rows
         self.expanded_rows = set()
         self.visible_rows = list()
@@ -104,6 +104,7 @@ class NestedTable:
         self.init_rows()
         self.project_id = project_id
         self._new_rows = list()
+        self.test_table()
 
     def pop_new_rows(self):
         tmp = self._new_rows
@@ -124,29 +125,33 @@ class NestedTable:
             if not new_rows:
                 raise ValueError("No new rows available")
             rows = new_rows
-        print(rows)
+        #print(rows)
         row_templates = [flask.render_template("project_row.html", row=row, project_id=self.project_id) for row in rows]
         row_group = flask.render_template("table_level.html", idx=group_idx, rows=row_templates)
-        #print("row_group:", row_group)
         return row_group
 
     def build_table_template(self) -> str:
+        for row in self.rows:
+            if "text" in row:
+                print("WTF ", row)
         if self.visible_rows:
             rows = [self._rows[idx] for idx in sorted(self.visible_rows)]
+            rows = [row for row in rows if "text" in row]
+
         else:
             print("Project INIT")
             # self.toggle_row(0)
             self.visible_rows.append(0)
             rows = [self._rows[0]]
         row_group = 0
-        print(f"building template with {len(rows)} rows: ", rows)
+        print(f"building template with {len(rows)} rows: ")
         row_group = self.build_new_row_group(row_group, rows)
         template = flask.render_template("project_table.html", row_group=row_group, max_depth=self.max_depth)
         # print(template)
         return template
 
     def toggle_row(self, idx: int) -> bool:
-        print("toggle row ", idx)
+        # print("toggle row ", idx)
         if not self.has_children(idx):
             raise ValueError("Cant toggle row ", idx)
         if idx in self.expanded_rows:
@@ -171,8 +176,21 @@ class NestedTable:
         """
         return len(self._rows) > idx + 1 and self.is_chield_of(self._rows[idx + 1], self._rows[idx])
 
+    def open_row(self, row_idx):
+        # open arbitrary row, let the code handle the rest
+        if row_idx in self.visible_rows:    # that means, the row has a parent assigned to it
+            raise NotImplemented # too tired..
+
+    def test_table(self):
+        for row_idx, row in enumerate(self.rows):
+            if self.has_children(row_idx):
+                self.expand_row(row_idx)
+        invisible_rows = set(range(len(self.rows))) - set(self.visible_rows)
+        if invisible_rows:
+            print("INVISIBLE_ROWS: ", invisible_rows)
+
     def expand_row(self, idx: int):
-        print("expand row ", idx)
+        # print("expand row ", idx)
         depth = self.rows[idx]["depth"]
         self.expanded_rows.add(idx)
         self._rows[idx].update({"is_expanded": True})
@@ -185,12 +203,12 @@ class NestedTable:
                 self._new_rows.append(row)
                 self.visible_rows.append(row_idx)
             elif row_depth <= depth:
-                print(idx, row_idx, self.rows[row_idx])
+                #print(idx, row_idx, self.rows[row_idx])
                 break
-        print(f"init table with {len(self._new_rows)} rows: {[row['idx'] for row in self._new_rows]}")
+        #print(f"init table with {len(self._new_rows)} rows: {[row['idx'] for row in self._new_rows]}")
 
     def collapse_row(self, idx: int, nested: bool = False):
-        print("Collapse row ", idx, nested, len(self.visible_rows))
+        #print("Collapse row ", idx, nested, len(self.visible_rows))
         self.expanded_rows.remove(idx)
         expanded_children = [row_idx for row_idx in self.expanded_rows if row_idx > 0 and
                              self._rows[row_idx]["parent"] == idx]
@@ -290,24 +308,35 @@ class Ableton_Project:
                 if i.tag not in search_list or i.tag in exclude_list:
                     continue
 
-            print("\t\t" * depth, i.tag, i.attrib, depth)
+            #print("\t\t" * depth, i.tag, i.attrib, depth)
             if len(i) > 0:
                 Ableton_Project._iter_print(i, depth + 1, search_list, exclude_list, search_for_occurence)
 
     def rec_search(self,
-                   search_list: typing.Optional[typing.Iterable] = None,
+                   search_word: str = "",
                    exclude_list: typing.Iterable = ("ParameterList",),
                    search_for_occurence: bool = False):
         if exclude_list is None:
             exclude_list = set()
-        if search_list is None:
-            search_list = set()
-        return self._rec_search(self.root, 0, exclude_list, search_list, search_for_occurence)
+
+        if search_word:
+            print("Searching for ", search_word)
+            node = self.root.findall(search_word)
+        else:
+            node = self.root
+        return self._rec_search(node, 0, exclude_list, set(), search_for_occurence)
+
+    def _rec_search2(self, depth: int, exclude_list: typing.Iterable, search_list: typing.Iterable):
+        result = []
+        nodes = self.root.findall(search_list)
+        print(nodes)
+
 
     @staticmethod
     def _rec_search(node, depth: int, exclude_list: typing.Iterable, search_list: typing.Iterable,
                     search_for_occurence: bool):
         result = []
+
         for i in node:
             if search_for_occurence:
                 if any([i.tag in sl for sl in search_list]) or any([i.tag in el for el in exclude_list]):
@@ -315,16 +344,19 @@ class Ableton_Project:
             else:
                 if i.tag not in search_list or i.tag in exclude_list:
                     continue
-            value = i.attrib
-            if "Value" in value:
-                value = value["Value"]
 
-            # print(i.attrib, type(i.attrib))
-            if len(str(value)) > 200:
-                print("Wow ", len(value), value)
             r = {"depth": depth, "tag": i.tag, }
-            if value:
-                r["value"] = value
+            if "Value" in i.attrib:
+                r["value"] = i.attrib["Value"]
+
+            text, tail = i.text, i.tail
+            text, tail = (prop.replace("\\r", "").replace("\\n", "").replace("\\t", "") if prop else None for prop in (text, tail, ))
+            if text:
+                print("GOT A text for ", i)
+                r["text"] = "MYTEXT " + str(i.text)[:100]
+            if tail:
+                print("GOT A tail ", tail)
+                r["tail"] = tail
             result.append(r)
             if len(i) > 0:
                 result += Ableton_Project._rec_search(i, depth + 1, exclude_list, search_list, search_for_occurence)
@@ -348,6 +380,7 @@ class Ableton_Project:
 
     def get_table_headers(self):
         return Track_Info.get_headers()
+
     def generate_display_table(self):
         tracks = self.get_track_objects()
         table_data = []
@@ -355,6 +388,7 @@ class Ableton_Project:
             for row in t.get_table_data():
                 table_data.append(row)
         return table_data
+
     def get_track_objects(self):
         tracks = []
         track_nodes = self.get_tracks()
@@ -425,7 +459,22 @@ def how_to_work_with_the_script(path: str):
     return example_project.build_json_object()
 
 
-if __name__=="__main__":
+"""
+def some_interesting_code():
+    rows: list
+    import itertools
+    from_iter = itertools.chain.from_iterable
+    
+    keys = set(from_iter([i.keys() for i in rows])) # all possible keys for the dicts in rows
+    # returns: {'value', 'depth', 'tag'}
+    
+    # all possible types for "value"-attributes for rows. None can mean that "value" is not a valid key
+    values = set([type(i["value"]) if "value" in i else None for i in rows])    
+    # returns: {None, <class 'dict'>, <class 'str'>}
+"""
+
+
+if __name__ == "__main__":
     from files import get_project_paths
     project_paths = get_project_paths()
     if project_paths:
@@ -435,4 +484,9 @@ if __name__=="__main__":
         ableton_project = Ableton_Project(pathlib.Path(path))
         # Find tags in project with iter_print-method
         ableton_project.iter_print(search_list=("Session", ), search_for_occurence=True)
+    # interesting row: 177144 (Take Lanes. There is no value  
     print("No paths found")
+
+    # ToDo: Make abstract table
+    # ToDo: make redirect to unique url for every table (i.e. project-table/0)
+    # ToDo: save state

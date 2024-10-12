@@ -1,57 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Ableton Organizer</title>
-        <script src="https://unpkg.com/htmx.org@2.0.3"></script>
-        <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
-        <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
-    </head>
+<head>
+    <meta charset="UTF-8">
+    <title>Ableton Organizer</title>
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
+    <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
+</head>
+<body>
 
-    <body>
-
-    <style>
-    .GroupTrack{
+<style>
+    .GroupTrack {
         background-color: chocolate;
     }
-    .MidiTrack{
+
+    .MidiTrack {
         background-color: antiquewhite;
     }
-    .AudioTrack{
+
+    .AudioTrack {
         background-color: firebrick;
     }
 
 
-    </style>
-    {% macro trackInfo(t, track_id, depth) %}
-        <tr>
-            {% for i in range(depth) %}
-                <td>
-                </td>
-            {% endfor %}
-            <td class="{{t["type"] }}">
-            {{ t["name"]["EffectiveName"]["Value"] }} ID {{ track_id }}
+</style>
+{% macro trackInfo(t, track_id, depth) %}
+    <tr>
+        {% for i in range(depth) %}
+            <td>
             </td>
-        </tr>
+        {% endfor %}
+        <td class="{{ t["type"] }}">
+            {{ t["name"]["EffectiveName"]["Value"] }} ID {{ track_id }}
+        </td>
+    </tr>
 
-    {% endmacro %}
-    <h1>
-        Hello World
+{% endmacro %}
+<div class="project-table">
+    <table id="project_table">
+        {% for path in paths %}
+            <tr>
+                {% set url = url_for('project_table') + "?project_id=" + loop.index0|string %}
+                <td>
+                    <button hx-get="{{ url }}" hx-swap="outerHTML" hx-target="#project_table">{{ url }}</button>
+                </td>
+            </tr>
+        {% endfor %}
+    </table>
 
-    </h1>
-    <p>
-        <table id="project_table">
-            {% for path in paths  %}
-                  <tr>
-                    {% set url = url_for('project_table') + "?project_id=" + loop.index0|string %}
-                    <td>
-                        <button hx-get="{{ url }}" hx-swap="outerHTML" hx-target="#project_table">{{ url }}</button>
-                    </td>
-                  </tr>
-            {% endfor %}
-        </table>
+</div>
+<ul id="bookmarks"
+    hx-on::beforeSwap="console.log('WORKS', this, event)"
+>
 
-    </p>
+</ul>
+<div id="info-box">
 
-    </body>
+</div>
+</body>
+<style>
+    .project-table {
+        display: block;
+    }
+
+    #info-box {
+        min-width: 5em;
+        max-width: 5em;
+        overflow: auto;
+        overflow-wrap: break-word;
+    }
+    #bookmarks{
+        min-width: 10em;
+        max-width: 10em;
+        overflow: auto;
+    }
+</style>
+
+<script>
+    if (typeof bookmarked_element === "undefined") {
+        let bookmarked_element = null;
+
+    }
+    let selectedDataPoint = null
+
+    setInfobox = function (text, button_id){
+        console.log("setInfobox ", button_id);
+        if (! button_id || !document.getElementById(button_id)){
+            return;
+        }else{
+            new_bookmarked_element = document.getElementById(button_id)
+            console.log("Found ELement!: ", button_id);
+
+            new_bookmarked_element.classList.add("active-bookmark");
+            if (selectedDataPoint !== null && selectedDataPoint !== undefined){
+                console.log("Removing class from ", selectedDataPoint)
+                bookmarked_element = document.getElementById(selectedDataPoint)
+                bookmarked_element.classList.remove("active-bookmark");
+            }
+            selectedDataPoint = button_id;
+        }
+
+     htmx.swap('#info-box', text, {swapStyle: 'innerHTML'})
+}
+
+</script>
+
 </html>

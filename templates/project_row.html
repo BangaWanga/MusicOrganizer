@@ -25,8 +25,47 @@
         {% elif row.has_children and not row.is_expanded %}
             <span class="toggle-row-arrow">↓</span>
         {% endif %}
-    <span id="depth-col" class="table-col depth-indicator-{{ row.depth }}"></span>
-    <span id="tag-col" class="table-col"> {{ row.tag }} </span>
-    <span id="value-col" class="table-col"> {{ row.value }} </span>
+    <span class="depth-col table-col depth-indicator-{{ row.depth }}"></span>
+    <span class="tag-col table-col"> {{ row.tag }} </span>
 
+    <div class="value-box table-col value-col" >
+        {% if row.value and row.value is mapping %}
+            <div class="outer-button" hx-trigger="click consume">
+                {% for tag, value in row.value.items() %}
+                    <label for="value-{{ row.idx }}-{{ tag }}" class="value-tag" title="tag"> {{ tag }}: </label>
+                    <span
+                            id="value-{{ row.idx }}-{{ tag }}"
+                            class="data-point"
+                            hx-get="/bookmark?idx={{ row.idx }}&tag={{ tag }}"
+                            hx-target="#bookmarks"
+                            hx-trigger="click"
+                            hx-swap="beforeend"
+                            hx-on:htmx:before-request="console.log('before request')"
+                            hx-on:htmx:after-request="setInfobox('<div> Row: {{ row.idx }} Tag: {{ tag }}<br>Value: {{ value }} </div>', 'bookmark_{{ row.idx }}{{ "_" + tag if tag else ""}}')";
+                    >
+                        {{ value }}
+                    </span>
+                {% endfor %}
+
+
+            </div>
+        {% elif row.value %}
+            <div class="outer-button" hx-trigger="click consume">
+                <span
+                        class="data-point"
+                        hx-get="/bookmark?idx={{ row.idx }}&tag={{ tag }}"
+                        hx-target="#bookmarks"
+                        hx-trigger="click"
+                        hx-swap="beforeend"
+                >
+                    {{ row.value }}
+                </span>
+            </div>
+        {% elif row.text %}
+            <label for="text_{{ row.idx }}" title="tag"> TEXTFELD: </label>
+            <span id="text_{{ row.idx }}" class="data-point text-field ">
+                {{ row.text }}
+            </span>
+        {% endif %}
+    </div>
 </div>

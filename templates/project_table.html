@@ -1,54 +1,125 @@
-<div id="table">
-    <div id="thead">
-        {% for header in headers %}
-            <div id="header_{{ header }}" class="header-item">
-                {{ header }}
-            </div>
-        {% endfor %}
+
+    <div id="table">
+        <div id="thead">
+            {% for header in headers %}
+                <div id="header_{{ header }}" class="header-item">
+                    {{ header }}
+                </div>
+            {% endfor %}
+        </div>
+        <div id="table-body">
+
+        </div>
+        {{ row_group | safe }}
     </div>
 
-    {{ row_group | safe }}
-</div>
+
 
 <style>
-
-    #value-col{
-        min-width: 50em;
-        max-width: 150em;
+    #table {
+        height: 80vh;
+        overflow: auto;
     }
 
-    #tag-col{
+    .value-col {
+        margin-left: 2em;
+        min-width: 50em;
+        max-width: 50em;
+    }
+
+
+    #bookmarks li {
+        display: inline;
+        overflow: scroll;
+        background-color: #5ecfff;
+        margin-left: 5px;
+        margin-right: 5px;
+        cursor: default;
+    }
+
+    #bookmarks li:hover {
+        background-color: #6cdbfc;
+    }
+    .active-bookmark {
+        box-shadow: inset 0 20px 40px rgba(0, 0, 0, 0.5);
+        background-color: #cd00cc; !important;
+    }
+
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background-color: #f0f0f0;
+    }
+
+    .outer-button {
+        background-color: #c2eeee; /* Outer button color */
+        border-radius: 8px;
+        justify-content: space-evenly;
+
+    {#
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        #} transition: all 0.2s ease;
+    }
+
+    .data-point {
+        background-color: #d1e0df; /* Inner button color */
+        border-radius: 2px;
+        transition: all 0.2s ease;
+        margin-left: 8px;
+        cursor: default;
+    }
+
+    .data-point:hover {
+        transform: translateY(2px);
+    }
+
+
+    .data-point:active {
+        transform: translateY(4px);
+        background-color: #3e8e41; /* Darker inner button color */
+    }
+
+    .tag-col {
         min-width: 20em;
         max-width: 20em;
     }
 
-    .expanded-row{
+    .expanded-row {
         background-color: #a5a5a5;
     }
-    .expanded-row:hover{
+
+    .expanded-row:hover {
         background-color: rgb(115, 148, 165);
     }
+
     .expandable-row {
         background-color: #5ecfff;
     }
-    .expandable-row:hover{
+    .expandable-row:hover {
         background-color: #6cdbfc;
     }
-    .table-col{
+
+    .table-col {
         margin-left: 1em;
         display: inline-block;
     }
-    .table-row{
-        display: block;
+
+    .table-row {
+        display: flex;
         margin-bottom: 5px;
     }
 
     {% for depth in range(max_depth) %}
-    .depth-indicator-{{ depth }}{
-        height: 100%;
-        min-width: {{ depth*3 }}px;
-        max-width: {{ depth*3 }}px;
-    }
+        .depth-indicator-{{ depth }} {
+            height: 100%;
+            min-width: {{ depth*3 }}px;
+            max-width: {{ depth*3 }}px;
+        }
     {% endfor  %}
 
 </style>

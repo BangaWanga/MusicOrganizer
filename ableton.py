@@ -1,3 +1,4 @@
+from __future__ import annotations
 import dataclasses
 import enum
 import os.path
@@ -256,6 +257,7 @@ class NestedTable:
     def toggle_row(self, idx: int) -> bool:
         # print("toggle row ", idx)
         if not self.has_children(idx):
+            print(idx, self._rows)
             raise ValueError("Cant toggle row ", idx)
         if idx in self.expanded_rows:
             self.collapse_row(idx)
@@ -360,6 +362,37 @@ class NestedTable:
                 self._rows[row_idx].update({"is_expanded": False})
         if not nested:
             self._new_rows.append(self._rows[idx])
+
+    @staticmethod
+    def from_ableton_project_list(projects: list[Ableton_Project], page_link: str, nested_table_id: int):
+        rows = [
+            {
+                "tag": "Ableton Projects",
+                "idx": 0,
+                "value": "",
+                "depth": 0,
+            }
+        ]
+        for _idx, project in enumerate(projects):
+
+            row = NestedTable.convert_ableton_project_to_row(project=project, idx=_idx+1, page_link=page_link + f"?project_id={_idx}",
+                                                   depth=1, parent=0, has_children=False)
+            rows.append(row)
+        return NestedTable(rows, nested_table_id)
+
+    @staticmethod
+    def convert_ableton_project_to_row(project: Ableton_Project, idx: int, page_link: str, depth: int, parent: int,
+                                       has_children: bool):
+        proj_path = str(project.project_path).replace("\\", "/")
+        return {
+            "idx": idx,
+            "tag": proj_path,
+            "value": proj_path,
+            "page_link": page_link,
+            "depth": depth,
+            "parent": parent,
+            "has_children": has_children
+        }
 
 
 class Ableton_Project:

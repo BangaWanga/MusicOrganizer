@@ -29,6 +29,7 @@ current_table: typing.Optional[int] = None
 def load_projects():
     print(f"Loading {len(project_paths)} .als files")
     global ableton_projects
+    ableton_projects = []
     for path in project_paths:
         ableton_projects.append(Ableton_Project(path))
 
@@ -89,6 +90,7 @@ def bookmark():
 
     return render_template("bookmark.html", tag=tag, row=row, value=value)
 
+
 @app.route("/project_table", methods=["GET"])
 def project_table():
     global nested_tables, current_table, bookmarks
@@ -104,7 +106,6 @@ def project_table():
     project_info = project.build_project_info_object()
     rows = project_info.build_render_info()
     nt = NestedTable(rows, project_id)  # ToDO: Does NestedTable really need id?
-    # nt.open_row(70248)
     nested_tables[project_id] = nt
     print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
     current_table = project_id
@@ -204,9 +205,14 @@ def get_project_depr():
 
 
 @app.route('/')
-def hello_world():  # put application's code here
+def index():  # put application's code here
     load_projects()
-    return render_template("index.html", paths=project_paths)
+    global ableton_projects, nested_tables
+    nt_id = len(nested_tables)
+    nt = NestedTable.from_ableton_project_list(ableton_projects, page_link="project_table", nested_table_id=nt_id)
+    nested_tables[nt_id] = nt
+    table_template = nt.build_table_template()
+    return render_template("index.html", paths=project_paths, table_template=table_template)
 
 
 @app.route("/project")

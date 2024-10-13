@@ -8,7 +8,7 @@
         {% if row.idx == 0 or row.page_link%}
             hx-target="#row_group_0"
             {% if row.page_link %}
-                hx-get="/{{ row.page_link }}?row={{ row.idx }}&project_id={{ project_id }}"
+                hx-get="/{{ row.page_link }}"
             {% else %}
                 hx-get="/toggle_row?row={{ row.idx }}&project_id={{ project_id }}"
             {% endif %}

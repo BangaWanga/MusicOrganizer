@@ -1,4 +1,13 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ableton Organizer</title>
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
+    <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
+</head>
+<body>
     <div id="table">
         <div id="thead">
             {% for header in headers %}
@@ -13,7 +22,7 @@
         {{ row_group | safe }}
     </div>
 
-
+</body>
 
 <style>
     #table {
@@ -123,3 +132,33 @@
     {% endfor  %}
 
 </style>
+
+<script>
+    if (typeof bookmarked_element === "undefined") {
+        let bookmarked_element = null;
+
+    }
+    let selectedDataPoint = null
+
+    setInfobox = function (text, button_id){
+        console.log("setInfobox ", button_id);
+        if (! button_id || !document.getElementById(button_id)){
+            return;
+        }else{
+            new_bookmarked_element = document.getElementById(button_id)
+            console.log("Found ELement!: ", button_id);
+
+            new_bookmarked_element.classList.add("active-bookmark");
+            if (selectedDataPoint !== null && selectedDataPoint !== undefined){
+                console.log("Removing class from ", selectedDataPoint)
+                bookmarked_element = document.getElementById(selectedDataPoint)
+                bookmarked_element.classList.remove("active-bookmark");
+            }
+            selectedDataPoint = button_id;
+        }
+
+     htmx.swap('#info-box', text, {swapStyle: 'innerHTML'})
+}
+
+</script>
+</html>

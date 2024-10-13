@@ -58,6 +58,12 @@ def project_search(search_word: str = "", project_id: int = None):
     return rows
 
 
+def get_project(project_id: int):
+    global ableton_projects
+    assert project_id in range(len(ableton_projects))
+    return ableton_projects[project_id]
+
+
 @app.route("/bookmark", methods=["GET"])
 def bookmark():
     tag = request.args.get('tag', None)
@@ -83,9 +89,31 @@ def bookmark():
 
     return render_template("bookmark.html", tag=tag, row=row, value=value)
 
-
 @app.route("/project_table", methods=["GET"])
 def project_table():
+    global nested_tables, current_table, bookmarks
+    bookmarks = set()
+    project_id = request.args.get('project_id', None)
+    search_word = request.args.get('search_word', None)
+    # search_word = ".//Buffer"
+    if str(project_id).isnumeric():
+        project_id = int(project_id)
+    else:
+        raise ValueError(f"{project_id} is not a valid project_id")
+    project = get_project(project_id=project_id)
+    project_info = project.build_project_info_object()
+    rows = project_info.build_render_info()
+    nt = NestedTable(rows, project_id)  # ToDO: Does NestedTable really need id?
+    # nt.open_row(70248)
+    nested_tables[project_id] = nt
+    print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
+    current_table = project_id
+    _template = nt.build_table_template()
+    return _template    # render_template("project_xml_table.html", rows=rows[:1000])
+
+
+@app.route("/project_table_xml", methods=["GET"])
+def project_table_xml():
 
     global nested_tables, current_table, bookmarks
     bookmarks = set()
@@ -101,7 +129,6 @@ def project_table():
         nt: NestedTable = nested_tables[project_id]
         current_table = project_id
         return nt.build_table_template()
-
     else:
         rows = project_search(search_word, project_id)
         nt = NestedTable(rows, project_id)
@@ -110,7 +137,7 @@ def project_table():
         print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
         current_table = project_id
         _template = nt.build_table_template()
-        return _template # render_template("project_table.html", rows=rows[:1000])
+        return _template # render_template("project_xml_table.html", rows=rows[:1000])
 
 
 @app.route("/toggle_row", methods=["GET"])
@@ -118,7 +145,7 @@ def project_table():
 def toggle_row():
     row_idx = request.args.get('row', None)
     project_id = request.args.get('project_id', None)
-    if not str(project_id).isnumeric() or (0 < int(project_id) >= len(nested_tables)):
+    if not str(project_id).isnumeric() or int(project_id) not in nested_tables:
         raise ValueError(f"{project_id} is not a valid project-id for {len(nested_tables)} projects")
     if int(project_id) not in nested_tables:
         return flask.redirect(flask.url_for('.project_table', project_id=project_id))
@@ -164,9 +191,9 @@ def get_projects():
     return response_object
 
 
-@app.route("/get_project", methods=["POST"])
+@app.route("/get_project_depr", methods=["POST"])
 @cross_origin(supports_credentials=True)
-def get_project():
+def get_project_depr():
     project_id = request.json["project_id"]
     project = ableton_projects[int(project_id)]
 

@@ -5,8 +5,9 @@ import pathlib
 import typing
 import xml.etree.ElementTree as ET
 import gzip
-
+from ableton_project_classes import AbletonProjectClass, FloatEvent
 import flask
+import math
 
 TMP_DIR = "tmp"
 
@@ -95,6 +96,109 @@ class Track_Info:
         return ["name", "type", "track_id", "PlugIns", "group_id", "depth"]
 
 
+class ProjectInfo:
+    def __init__(self, root: ET.Element):
+        self.tracks = root.find(".//Tracks")
+        self.track_infos = [self.build_track_info(track) for track in self.tracks]
+        self.master_track = root.find(".//MasterTrack")
+        self.project = root.find(".//Ableton")
+
+    def build_render_info(self):
+        _rows = [self.make_render_info(self.project, idx=0, has_children=True, depth=0, parent=None),
+                 self.make_render_info(element=self.tracks, idx=1, has_children=len(self.track_infos) > 0, depth=1,
+                                       parent=0)]
+        for track_idx, track_info in enumerate(self.track_infos):
+            _rows.append(
+                self.make_render_info(element=track_info, idx=len(_rows), has_children=False, depth=2, parent=1))
+        _rows.append(self.make_render_info(self.build_master_track_info(),  idx=len(_rows), depth=1, parent=0, has_children=False))
+        return _rows
+
+    @staticmethod
+    def make_render_info(element: typing.Union[dict, ET.Element, AbletonProjectClass], idx: int, has_children: bool,
+                          depth: int, parent: typing.Optional[int]):
+        return ProjectInfo._make_render_info(element, idx, has_children, depth, parent)
+
+    @staticmethod
+    def _make_render_info(element: typing.Union[dict, ET.Element, AbletonProjectClass], idx: int, has_children: bool,
+                          depth: int, parent: typing.Optional[int]):
+        is_dict = isinstance(element, dict)
+        additional_data = None
+        if is_dict:
+            def unpack(key, val):
+                if isinstance(val, list):
+
+                    print(key, [(i.attrib, i, ) for _idx, i in enumerate(val)])
+                    return {_idx: i.attrib["Value"] for _idx, i in enumerate(val)}
+                print("Unpack value: ", val)
+                return val.attrib["Value"]
+            tag = element["tag"]
+            additional_data = element.get("additional_data", [])
+            value = {key: unpack(key, elem) for key, elem in element.items() if key not in {"tag", "additional_data"}}
+        else:
+            value = element.attrib
+            tag = element.tag
+        return {
+            "value": value,
+            "idx": idx,
+            "has_children": has_children,
+            "depth": depth,
+            "parent": parent,
+            "tag": tag,
+            "additional_data": additional_data
+        }
+
+    def build_master_track_info(self):
+        master_track: ET.Element = self.master_track
+        master_envelopes = master_track.findall("AutomationEnvelopes/Envelopes/AutomationEnvelope")
+        bpm_envelope = list(
+            filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='8']") is not None else False, master_envelopes))[0]
+        bpm_events: list = bpm_envelope.findall("Automation/Events/FloatEvent")
+        apcs = [FloatEvent(elem) for elem in bpm_events]
+        if len(apcs) > 1 or not apcs:
+            raise ValueError("multiple bpms or no bpm")
+        return {
+            "bpm": apcs[0],
+            "tag": "Master Track"
+        }
+
+    def render_fader(self, value: float, min_val: float, max_val: float, tag: str, sideways=True):
+        offset = (50, 50, )
+        value_norm = (value - min_val) / (max_val-min_val)
+        return flask.render_template("fader.html", offset=offset, value=value_norm, sideways=sideways, tag=tag)
+
+    def render_poti(self, value: float, min_val: float, max_val: float, ):
+        offset = (50, 50, )
+
+        r = 40
+        value_norm = (value - min_val) / (max_val-min_val)
+        a = value_norm * (2*math.pi/1)
+        line_pos0 = offset
+        line_pos1 = (int(offset[0] + r * math.cos(a)), int(offset[1] + r * math.sin(a)), )
+        return flask.render_template("poti.html", line_pos0=line_pos0, line_pos1=line_pos1, radius=r, value=value)
+
+    def build_track_info(self, track: ET.Element):
+        track_delay = track.find("TrackDelay/Value")  # has .attrib["Value"]
+        print("track_delay.attrib: ", track_delay.attrib)
+        name = track.find("Name/EffectiveName")
+        color = track.find("Color")
+        pan = track.find("DeviceChain/Mixer/Pan/Manual")
+        sends: list = track.findall("DeviceChain/Mixer/Sends/TrackSendHolder/Send")
+        print("SENDS:  ", sends)
+        volume = track.find("DeviceChain/Mixer/Volume/Manual")
+        audio_output_routing = track.find("DeviceChain/AudioOutputRouting/Target")
+        additional_data = [self.render_fader(value=float(pan.attrib["Value"]), min_val=-1., max_val=1, tag="Pan")]
+        return {
+            "track_delay": track_delay,
+            "name": name,
+            "color": color,
+            "pan": pan,
+            #"sends": sends,
+            "volume": volume,
+            "audio_output_routing": audio_output_routing,
+            "tag": name.attrib["Value"],
+            "additional_data": additional_data
+        }
+
 class NestedTable:
     def __init__(self, rows: list[dict[str, typing.Any]], project_id: int, ):
         self._rows = rows
@@ -127,7 +231,8 @@ class NestedTable:
                 raise ValueError("No new rows available")
             rows = new_rows
         #print(rows)
-        row_templates = [flask.render_template("project_xml_row.html", row=row, project_id=self.project_id) for row in rows]
+        row_templates = [flask.render_template("project_xml_row.html", row=row, project_id=self.project_id,
+                                               additionals=row.get("additional_data", None)) for row in rows]
         row_group = flask.render_template("row-group.html", idx=group_idx, rows=row_templates)
         return row_group
 
@@ -144,7 +249,7 @@ class NestedTable:
         if rows:
             print(f"building template with {len(rows)} rows: ")
         row_group = self.build_new_row_group(row_group, rows)
-        template = flask.render_template("project_table.html", row_group=row_group, max_depth=self.max_depth)
+        template = flask.render_template("project_xml_table.html", row_group=row_group, max_depth=self.max_depth)
         # print(template)
         return template
 
@@ -268,6 +373,9 @@ class Ableton_Project:
         self.init_dirs()
         # self.scan_project_dir()
         self.load_ableton_project(project_path)
+
+    def build_project_info_object(self) -> ProjectInfo:
+        return ProjectInfo(self.root)
 
     def init_dirs(self):
         if not os.path.exists(TMP_DIR):

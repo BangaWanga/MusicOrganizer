@@ -4,17 +4,23 @@
             {% if row.is_expanded %}expanded-row
             {% elif row.has_children %}expandable-row
             {% endif %}"
-        hx-get="/toggle_row?row={{ row.idx }}&project_id={{ project_id }}"
 
-        {% if row.idx == 0 %}
+        {% if row.idx == 0 or row.page_link%}
             hx-target="#row_group_0"
+            {% if row.page_link %}
+                hx-get="/{{ row.page_link }}?row={{ row.idx }}&project_id={{ project_id }}"
+            {% else %}
+                hx-get="/toggle_row?row={{ row.idx }}&project_id={{ project_id }}"
+            {% endif %}
         {% elif row.has_children and not row.is_expanded %}
             hx-target="#row_{{ row.idx }}"
+            hx-get="/toggle_row?row={{ row.idx }}&project_id={{ project_id }}"
         {% elif row.has_children and row.is_expanded %}
             hx-target="#row_group_{{ row.idx }}"
+            hx-get="/toggle_row?row={{ row.idx }}&project_id={{ project_id }}"
         {% endif %}
 
-        {% if row.is_expanded or row.has_children%}
+        {% if row.is_expanded or row.has_children or row.page_link%}
             hx-trigger="click"
             hx-swap="outerHTML"
         {% endif %}
@@ -68,6 +74,11 @@
             <span id="text_{{ row.idx }}" class="data-point text-field ">
                 {{ row.text }}
             </span>
+        {% endif %}
+        {% if row.additional_data %}
+            {% for add in row.additional_data %}
+                {{ add | safe }}
+            {% endfor %}
         {% endif %}
 
     </div>

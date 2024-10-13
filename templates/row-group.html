@@ -1,5 +1,4 @@
-<div id="row_group_{{ idx }}" class="row-group"
-{% if idx > 0 %}  {% endif %} >
+<div id="row_group_{{ idx }}" class="row-group">
     {% for row in rows %}
         {{ row | safe }}
     {% endfor %}

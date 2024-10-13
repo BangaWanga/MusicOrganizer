@@ -61,11 +61,14 @@
                     {{ row.value }}
                 </span>
             </div>
-        {% elif row.text %}
+
+        {% endif %}
+        {% if row.text %}
             <label for="text_{{ row.idx }}" title="tag"> TEXTFELD: </label>
             <span id="text_{{ row.idx }}" class="data-point text-field ">
                 {{ row.text }}
             </span>
         {% endif %}
+
     </div>
 </div>

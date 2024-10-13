@@ -104,11 +104,12 @@ class NestedTable:
         self.init_rows()
         self.project_id = project_id
         self._new_rows = list()
-        self.test_table()
+        # self.test_table()
 
     def pop_new_rows(self):
         tmp = self._new_rows
         self._new_rows = list()
+        print("_new_rows :", len(tmp))
         return tmp
 
     def init_rows(self):
@@ -126,25 +127,22 @@ class NestedTable:
                 raise ValueError("No new rows available")
             rows = new_rows
         #print(rows)
-        row_templates = [flask.render_template("project_row.html", row=row, project_id=self.project_id) for row in rows]
-        row_group = flask.render_template("table_level.html", idx=group_idx, rows=row_templates)
+        row_templates = [flask.render_template("project_xml_row.html", row=row, project_id=self.project_id) for row in rows]
+        row_group = flask.render_template("row-group.html", idx=group_idx, rows=row_templates)
         return row_group
 
     def build_table_template(self) -> str:
-        for row in self.rows:
-            if "text" in row:
-                print("WTF ", row)
         if self.visible_rows:
-            rows = [self._rows[idx] for idx in sorted(self.visible_rows)]
-            rows = [row for row in rows if "text" in row]
-
+            rows = None# [self._rows[idx] for idx in self.visible_rows]
+            # rows = [row for row in rows if "text" in row]
         else:
             print("Project INIT")
             # self.toggle_row(0)
             self.visible_rows.append(0)
             rows = [self._rows[0]]
         row_group = 0
-        print(f"building template with {len(rows)} rows: ")
+        if rows:
+            print(f"building template with {len(rows)} rows: ")
         row_group = self.build_new_row_group(row_group, rows)
         template = flask.render_template("project_table.html", row_group=row_group, max_depth=self.max_depth)
         # print(template)
@@ -177,10 +175,37 @@ class NestedTable:
         return len(self._rows) > idx + 1 and self.is_chield_of(self._rows[idx + 1], self._rows[idx])
 
     def open_row(self, row_idx):
+        raise NotImplemented("This is buggy")
         # open arbitrary row, let the code handle the rest
+        row_path = []
         if row_idx in self.visible_rows:    # that means, the row has a parent assigned to it
-            raise NotImplemented # too tired..
+            raise NotImplemented    # too tired..
+        elif 0 > row_idx or row_idx >= len(self._rows):
+            raise ValueError("Invalid row", row_idx)
+        target_row = self.rows[row_idx]
+        # self.visible_rows.append(row_idx)
+        print("TARGET ROW ", target_row)
+        for _idx in reversed(range(len(self.rows))[row_idx+1:]):
+            depth = target_row["depth"]
+            if self.rows[_idx]["depth"] == depth - 1:
+                self.expanded_rows.add(_idx)
+                target_row.update(
+                    {"parent": _idx, "has_children": True if _idx != row_idx else self.has_children(row_idx)}
+                )
+                row_path.append(target_row)
+            target_row = self.rows[_idx]
+            if _idx == 0:
+                target_row.update({"parent": None, "has_children": True})
+                row_path.append(target_row)
+        _new_rows = list(reversed(row_path))
+        indices = [r["idx"] for r in _new_rows]
+        self._new_rows = _new_rows
+        self.visible_rows.extend(indices)
+        return list(reversed(row_path))
 
+    def row_obj(self, idx: int, tag: str, ):
+        return {
+        }
     def test_table(self):
         for row_idx, row in enumerate(self.rows):
             if self.has_children(row_idx):

@@ -16,6 +16,7 @@ CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS=True)
 #CORS(app, resources={r'/*': {'origins': '*'}})
 
 app.config['CORS_HEADERS'] = 'Content-Type'
+
 ableton_projects: list[Ableton_Project] = []
 project_paths: list[pathlib.Path] = get_project_paths()
 nested_tables: dict[int, NestedTable] = dict()
@@ -27,11 +28,17 @@ current_table: typing.Optional[int] = None
 
 def load_projects():
     print(f"Loading {len(project_paths)} .als files")
+    global ableton_projects
     for path in project_paths:
         ableton_projects.append(Ableton_Project(path))
 
 
 load_projects()
+
+
+@app.route('/reload_projects')
+def reload_projects():
+    load_projects()
 
 
 @app.route('/test')
@@ -84,6 +91,7 @@ def project_table():
     bookmarks = set()
     project_id = request.args.get('project_id', None)
     search_word = request.args.get('search_word', None)
+    # search_word = ".//Buffer"
     if str(project_id).isnumeric():
         project_id = int(project_id)
     else:
@@ -97,6 +105,7 @@ def project_table():
     else:
         rows = project_search(search_word, project_id)
         nt = NestedTable(rows, project_id)
+        # nt.open_row(70248)
         nested_tables[project_id] = nt
         print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
         current_table = project_id

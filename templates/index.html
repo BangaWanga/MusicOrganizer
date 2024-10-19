@@ -7,67 +7,42 @@
     <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
     <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
 </head>
-<body>
-
-<style>
-    .GroupTrack {
-        background-color: chocolate;
-    }
-
-    .MidiTrack {
-        background-color: antiquewhite;
-    }
-
-    .AudioTrack {
-        background-color: firebrick;
-    }
-
-
-</style>
-
-<div>
-    <a href="/">
-        <span id="home-btn"><h3>HOME</h3></span>
-    </a>
-</div>
-
-<div class="project-table">
-    {{ table_template | safe }}
-</div>
-<ul id="bookmarks"
-    hx-on::beforeSwap="console.log('WORKS', this, event)"
->
-
-</ul>
-<div id="info-box">
-
-</div>
-</body>
-<style>
-    #home-btn{
-        min-width: 5em;
-        max-width: 5em;
-        background-color: #6cdbfc;
-    }
-
-    .project-table {
-        display: block;
-    }
-
-    #info-box {
-        min-width: 5em;
-        max-width: 5em;
-        overflow: auto;
-        overflow-wrap: break-word;
-    }
-    #bookmarks{
-        min-width: 10em;
-        max-width: 10em;
-        overflow: auto;
-    }
-</style>
 
 <script>
+    if ('showOpenFilePicker' in self) {
+        // The `showOpenFilePicker()` method of the File System Access API is supported.
+        console.log("SUCCESS!")
+        let fileHandle;
+
+
+    } else {
+        console.log("No SUCCESS!")
+
+    }
+    readNewFiles = function(){
+        let files = document.getElementById("files").files;
+        for (let file = 0 ; file < files.length; file++) {
+
+        }
+    }
+    get_project_paths = function(event) {
+        let project_paths = []
+        for (const file of event.target.files) {
+            project_paths.push(file.webkitRelativePath)
+            console.log("GETO ", file, )
+        }
+        console.log("project_paths:" , project_paths);
+        return project_paths;
+    }
+    add_project_paths = function(event) {
+            let output = document.getElementById("new-file-path-list");
+            for (const file of event.target.files) {
+                let item = document.createElement("li");
+                item.textContent = file.webkitAbsolutePath;
+                console.log("ITEM ", item);
+                output.appendChild(item);
+            }
+    }
     if (typeof bookmarked_element === "undefined") {
         let bookmarked_element = null;
 
@@ -95,5 +70,91 @@
 }
 
 </script>
+<body>
+
+<style>
+    .GroupTrack {
+        background-color: chocolate;
+    }
+
+    .MidiTrack {
+        background-color: antiquewhite;
+    }
+
+    .AudioTrack {
+        background-color: firebrick;
+    }
+
+
+</style>
+
+<a href="/" class="button" id="home-btn">
+    <span ><h3>HOME</h3></span>
+</a>
+
+<div id="new-project-picker">
+
+    <label for="new-project-path"></label>
+    <form
+            hx-on:change="add_project_paths(event);htmx.ajax('POST', '/project_paths', {'swap': 'innerHTML', 'target': '#new-file-path-list', 'values':{'paths': get_project_paths(event)}})">
+        <input id="new-project-path" name="files" type="file" webkitdirectory multiple/>
+        <input id="submit-new-project-paths" type="submit"/>
+    </form>
+    <ul id="new-file-path-list">
+
+    </ul>
+</div>
+<span id="textArea">
+
+</span>
+
+<div class="project-table">
+    {{ table_template | safe }}
+</div>
+<ul id="bookmarks"
+    hx-on::beforeSwap="console.log('WORKS', this, event)"
+>
+
+</ul>
+<div id="info-box">
+
+</div>
+</body>
+<style>
+    #home-btn{
+        min-width: 5em;
+        max-width: 5em;
+        background-color: #6cdbfc;
+        text-align: center;
+    }
+
+    .project-table {
+        display: block;
+    }
+
+    #info-box {
+        min-width: 5em;
+        max-width: 5em;
+        overflow: auto;
+        overflow-wrap: break-word;
+    }
+    #bookmarks{
+        min-width: 10em;
+        max-width: 10em;
+        overflow: auto;
+    }
+</style>
+
 
 </html>
+<script>
+    document.getElementById("submit-new-project-paths").addEventListener('click', async () => {
+        // Destructure the one-element array.
+        textArea = document.getElementById("textArea")
+        [fileHandle] = await window.showOpenFilePicker();
+        const file = await fileHandle.getFile();
+        textArea.value = await file.text();
+
+        // Do something with the file handle.
+    });
+</script>

@@ -34,6 +34,7 @@
     <span class="depth-col table-col depth-indicator-{{ row.depth }}"></span>
     <span class="tag-col table-col"> {{ row.tag }} </span>
 
+
     <div class="value-box table-col value-col" >
         {% if row.value and row.value is mapping %}
             <div class="outer-button" hx-trigger="click consume">
@@ -56,7 +57,11 @@
 
             </div>
         {% elif row.value %}
-            <div class="outer-button" hx-trigger="click consume">
+            <div class="outer-button"
+                {% if not row.page_link %}
+                    hx-trigger="click consume"
+                {% endif %}
+            >
                 <span
                         class="data-point"
                         hx-get="/bookmark?idx={{ row.idx }}&tag={{ tag }}"

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ableton Organizer</title>
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
+    <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
+</head>
+
+
+<body>
+
+
+    <div>
+        <span>
+            MIDI DEVICES
+        </span>
+        <br>
+        {% for midi_device in midi_outs %}
+            <div>
+                <button hx-get="/midi_device?port={{ loop.index0 }}" hx-swap="innerHTML" hx-target="#midi-device">
+                    {{ midi_device }}
+                </button>
+
+            </div>
+            <br>
+        {% endfor %}
+    </div>
+
+
+    <div id="midi-device">
+
+
+    </div>
+
+
+</body>
+
+<style>
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background-color: #f0f0f0;
+    }
+</style>
+</html>
+<script>
+
+    document.body.addEventListener('htmx:beforeRequest', function(event) {
+    console.log(event); // Execution will pause here when triggered
+    // Examine event details
+});
+</script>
+
+
+
+
+

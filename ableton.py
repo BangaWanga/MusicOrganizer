@@ -128,9 +128,9 @@ class ProjectInfo:
             def unpack(key, val):
                 if isinstance(val, list):
 
-                    print(key, [(i.attrib, i, ) for _idx, i in enumerate(val)])
+                    # print(key, [(i.attrib, i, ) for _idx, i in enumerate(val)])
                     return {_idx: i.attrib["Value"] for _idx, i in enumerate(val)}
-                print("Unpack value: ", val)
+                # print("Unpack value: ", val)
                 return val.attrib["Value"]
             tag = element["tag"]
             additional_data = element.get("additional_data", [])
@@ -179,12 +179,12 @@ class ProjectInfo:
 
     def build_track_info(self, track: ET.Element):
         track_delay = track.find("TrackDelay/Value")  # has .attrib["Value"]
-        print("track_delay.attrib: ", track_delay.attrib)
+        # print("track_delay.attrib: ", track_delay.attrib)
         name = track.find("Name/EffectiveName")
         color = track.find("Color")
         pan = track.find("DeviceChain/Mixer/Pan/Manual")
         sends: list = track.findall("DeviceChain/Mixer/Sends/TrackSendHolder/Send")
-        print("SENDS:  ", sends)
+        # print("SENDS:  ", sends)
         volume = track.find("DeviceChain/Mixer/Volume/Manual")
         audio_output_routing = track.find("DeviceChain/AudioOutputRouting/Target")
         additional_data = [self.render_fader(value=float(pan.attrib["Value"]), min_val=-1., max_val=1, tag="Pan")]
@@ -214,7 +214,7 @@ class NestedTable:
     def pop_new_rows(self):
         tmp = self._new_rows
         self._new_rows = list()
-        print("_new_rows :", len(tmp))
+        # print("_new_rows :", len(tmp))
         return tmp
 
     def init_rows(self):
@@ -396,23 +396,18 @@ class NestedTable:
 
 
 class Ableton_Project:
-    def __init__(self, project_path: pathlib.Path):
+    def __init__(self, project_path: pathlib.Path, ):
         self.project_path = project_path
         self.exports: list[pathlib.Path] = []
         self.project_files: list[pathlib.Path] = []
         self.tmp_path = "tmp"
         self.tree = None
         self.root = None
-        self.init_dirs()
         # self.scan_project_dir()
         self.load_ableton_project(project_path)
 
     def build_project_info_object(self) -> ProjectInfo:
         return ProjectInfo(self.root)
-
-    def init_dirs(self):
-        if not os.path.exists(TMP_DIR):
-            os.mkdir(TMP_DIR)
 
     def __str__(self):
         return f"\nAbletonProject\nproj-path: {self.project_path}\nexports: {self.exports}\nproj-files: {self.project_files}"
@@ -434,6 +429,10 @@ class Ableton_Project:
         return self.tree
 
     def load_ableton_project(self, path: pathlib.Path):
+        from files import load_ableton_project
+        self.tree = load_ableton_project(path)
+        self.root = self.tree.getroot()
+        return
         # copy .als file, extract it and read
         import shutil
         tmp_path = pathlib.Path(TMP_DIR).joinpath(

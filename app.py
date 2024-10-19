@@ -2,32 +2,36 @@ import pathlib
 import sys
 import typing
 
-from files import get_project_paths, PROJECT_FILES_PATH
+from files import get_project_paths, PROJECT_FILES_PATH, init
 from flask_cors import CORS, cross_origin
 import flask
 from flask import Flask, render_template, request, jsonify
+import time
 
 from ableton import how_to_work_with_the_script, Ableton_Project, NestedTable
-
+from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 
 Cors = CORS(app)
 CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS=True)
-#CORS(app, resources={r'/*': {'origins': '*'}})
+# CORS(app, resources={r'/*': {'origins': '*'}})
 
 app.config['CORS_HEADERS'] = 'Content-Type'
-
+socketio = SocketIO(app)
 ableton_projects: list[Ableton_Project] = []
 project_paths: list[pathlib.Path] = get_project_paths()
 nested_tables: dict[int, NestedTable] = dict()
 bookmarks = set()
-print(project_paths)
+ENABLE_MIDI = False
+if ENABLE_MIDI:
+    from midi import get_midi_outs, Midi_Port, MIDI_Signal, MIDI_Type
 
+    midi_port: Midi_Port = typing.Optional[None]
+port = None
 current_table: typing.Optional[int] = None
-
+file_pick_thread = None
 
 def load_projects():
-    print(f"Loading {len(project_paths)} .als files")
     global ableton_projects
     ableton_projects = []
     for path in project_paths:
@@ -35,6 +39,15 @@ def load_projects():
 
 
 load_projects()
+import tkinter as tk
+from tkinter import filedialog
+
+
+def OpenFileDialog():
+    root = tk.Tk()
+    root.withdraw()
+    root.focus_set()
+    file_path = filedialog.askdirectory()
 
 
 @app.route('/reload_projects')
@@ -91,8 +104,44 @@ def bookmark():
     return render_template("bookmark.html", tag=tag, row=row, value=value)
 
 
+@app.route("/send_midi_signal", methods=["Get", "POST"])
+@cross_origin(headers=['Content-Type'])
+def send_midi_signal():
+    global midi_port
+    print("Sending Tone ", request.args, request.form, request.values)
+    note = request.form.get("note", None)
+    velocity = request.form.get("velocity", None)
+    assert note is not None and note.isnumeric()
+    assert velocity is not None and velocity.isnumeric()
+    note, velocity = int(note), int(velocity)
+    assert 0 < note < 128
+    assert 0 < velocity < 128
+
+    channel = 0
+    note_on = MIDI_Type.Note_On(channel, note, velocity)
+    note_off = MIDI_Type.Note_Off(channel, note, velocity)
+    midi_port.send(note_on, )
+    time.sleep(0.5)
+    midi_port.send(note_off,)
+    return {"status": 200}
+
+@app.route("/midi_device", methods=["GET"])
+def midi_device():
+    global midi_port, port
+    _port = request.args.get('port', None)
+    assert _port and _port.isnumeric()
+    if port is None or port != _port:
+        port = int(_port)
+        midi_port = Midi_Port(port)
+    return flask.render_template("midi_device.html", name=get_midi_outs()[port])
+
+@app.route("/midi_devices", methods=["GET"])
+def midi_devices():
+
+    return flask.render_template("midi_devices.html", midi_outs=get_midi_outs())
+
 @app.route("/project_table", methods=["GET"])
-def project_table():
+def project_table_():
     global nested_tables, current_table, bookmarks
     bookmarks = set()
     project_id = request.args.get('project_id', None)
@@ -107,7 +156,7 @@ def project_table():
     rows = project_info.build_render_info()
     nt = NestedTable(rows, project_id)  # ToDO: Does NestedTable really need id?
     nested_tables[project_id] = nt
-    print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
+    # print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
     current_table = project_id
     _template = nt.build_table_template()
     return _template    # render_template("project_xml_table.html", rows=rows[:1000])
@@ -135,7 +184,7 @@ def project_table_xml():
         nt = NestedTable(rows, project_id)
         # nt.open_row(70248)
         nested_tables[project_id] = nt
-        print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
+        # print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
         current_table = project_id
         _template = nt.build_table_template()
         return _template # render_template("project_xml_table.html", rows=rows[:1000])
@@ -157,17 +206,17 @@ def toggle_row():
     project_id = int(project_id)
     row_idx = int(row_idx)
     nt = nested_tables[project_id]
-    print("Before toggle row")
+    #print("Before toggle row")
     is_expanded = nt.toggle_row(row_idx)
     row_group = nt.build_new_row_group(row_idx)
-    print(f"is_expanded: {is_expanded}. Added rows for row {row_idx}: {len(row_group)}", )
+    # print(f"is_expanded: {is_expanded}. Added rows for row {row_idx}: {len(row_group)}", )
     return row_group
 
 
 @app.route("/get_project_search", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def get_project_search():
-    print("get_project_search ", request.args)
+    #print("get_project_search ", request.args)
     project_id = request.args.get('project_id', None)
     search_word = request.args.get('search_word', None)
     if str(project_id).isnumeric():
@@ -178,7 +227,7 @@ def get_project_search():
     rows = project_search(search_word, project_id)
     nt = NestedTable(rows, project_id)
     nested_tables[project_id] = nt
-    print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
+    #print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
     response_object = {'status': 'success', "rows": rows}
     return response_object
 
@@ -203,6 +252,25 @@ def get_project_depr():
         print(idx, tr)
     return response_object
 
+
+@app.route('/project_paths', methods=["GET"])
+def add_project_paths():
+    print(request.form.keys())
+    for path in request.form.getlist("paths"):
+        print("path: ", path,)
+    print("add_project_paths ", request.form, request.values)
+    paths = request.form.get("paths")
+    if paths:
+        print(paths)
+        import shutil
+
+        # shutil.copyfile(pathlib.Path(paths), PROJECT_FILES_PATH)
+    # print("add_project_paths ", request.is_json, request.args, request.data, request.files)
+    import multiprocessing
+    global file_pick_thread
+    file_pick_thread = multiprocessing.Process(target=OpenFileDialog, args=tuple())
+    file_pick_thread.start()
+    return flask.render_template("project_selection.html", )
 
 @app.route('/')
 def index():  # put application's code here
@@ -231,7 +299,6 @@ def system_view():
     return render_template("project_view.html", tracks=project.build_json_object())
 
 
-
-
 if __name__ == '__main__':
-    app.run()
+    print("Sock")
+    socketio.run(app)

@@ -3,7 +3,8 @@
         class="table-row
             {% if row.is_expanded %}expanded-row
             {% elif row.has_children %}expandable-row
-            {% endif %}"
+            {% endif %}
+            {% if row.color %}ableton-col-{{ row.color }}{% endif %}"
 
         {% if row.idx == 0 or row.page_link%}
             hx-target="#row_group_0"

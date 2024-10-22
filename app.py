@@ -2,13 +2,13 @@ import pathlib
 import sys
 import typing
 
-from files import get_project_paths, PROJECT_FILES_PATH, init
+from files import get_project_paths, PROJECT_FILES_PATH, init, set_project_path
 from flask_cors import CORS, cross_origin
 import flask
 from flask import Flask, render_template, request, jsonify
 import time
 
-from ableton import how_to_work_with_the_script, Ableton_Project, NestedTable
+from ableton import Ableton_Project, NestedTable
 from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 
@@ -18,6 +18,15 @@ CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS=True)
 
 app.config['CORS_HEADERS'] = 'Content-Type'
 socketio = SocketIO(app)
+init()
+
+XML_MODE = True
+project_table_url = "/project_table"
+project_table_xml_url = "/project_table_xml"
+if XML_MODE:
+    project_table_url = "/project_table_"
+    project_table_xml_url = "/project_table"
+
 ableton_projects: list[Ableton_Project] = []
 project_paths: list[pathlib.Path] = get_project_paths()
 nested_tables: dict[int, NestedTable] = dict()
@@ -48,6 +57,7 @@ def OpenFileDialog():
     root.withdraw()
     root.focus_set()
     file_path = filedialog.askdirectory()
+    set_project_path(file_path)
 
 
 @app.route('/reload_projects')
@@ -68,6 +78,11 @@ def project_search(search_word: str = "", project_id: int = None):
     if project_id is None:
         return {'status': 'error, no project_id provided'}
     project = ableton_projects[project_id]
+    print("project.is_loaded: ", project.is_loaded)
+    if not project.is_loaded:
+        success = project.load_ableton_project()
+        if not success:
+            raise ValueError("Error when opening project: ", project.project_path)
     rows = project.rec_search(search_word=search_word, search_for_occurence=True)
     return rows
 
@@ -125,6 +140,7 @@ def send_midi_signal():
     midi_port.send(note_off,)
     return {"status": 200}
 
+
 @app.route("/midi_device", methods=["GET"])
 def midi_device():
     global midi_port, port
@@ -135,13 +151,14 @@ def midi_device():
         midi_port = Midi_Port(port)
     return flask.render_template("midi_device.html", name=get_midi_outs()[port])
 
+
 @app.route("/midi_devices", methods=["GET"])
 def midi_devices():
-
     return flask.render_template("midi_devices.html", midi_outs=get_midi_outs())
 
-@app.route("/project_table", methods=["GET"])
-def project_table_():
+
+@app.route(project_table_url, methods=["GET"])
+def project_table():
     global nested_tables, current_table, bookmarks
     bookmarks = set()
     project_id = request.args.get('project_id', None)
@@ -152,6 +169,10 @@ def project_table_():
     else:
         raise ValueError(f"{project_id} is not a valid project_id")
     project = get_project(project_id=project_id)
+    if not project.is_loaded:
+        success = project.load_ableton_project()
+        if not success:
+            raise ValueError("Error when opening project: ", project.project_path)
     project_info = project.build_project_info_object()
     rows = project_info.build_render_info()
     nt = NestedTable(rows, project_id)  # ToDO: Does NestedTable really need id?
@@ -162,7 +183,7 @@ def project_table_():
     return _template    # render_template("project_xml_table.html", rows=rows[:1000])
 
 
-@app.route("/project_table_xml", methods=["GET"])
+@app.route(project_table_xml_url, methods=["GET"])
 def project_table_xml():
 
     global nested_tables, current_table, bookmarks
@@ -206,7 +227,6 @@ def toggle_row():
     project_id = int(project_id)
     row_idx = int(row_idx)
     nt = nested_tables[project_id]
-    #print("Before toggle row")
     is_expanded = nt.toggle_row(row_idx)
     row_group = nt.build_new_row_group(row_idx)
     # print(f"is_expanded: {is_expanded}. Added rows for row {row_idx}: {len(row_group)}", )
@@ -216,7 +236,6 @@ def toggle_row():
 @app.route("/get_project_search", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def get_project_search():
-    #print("get_project_search ", request.args)
     project_id = request.args.get('project_id', None)
     search_word = request.args.get('search_word', None)
     if str(project_id).isnumeric():
@@ -227,7 +246,6 @@ def get_project_search():
     rows = project_search(search_word, project_id)
     nt = NestedTable(rows, project_id)
     nested_tables[project_id] = nt
-    #print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
     response_object = {'status': 'success', "rows": rows}
     return response_object
 
@@ -235,7 +253,6 @@ def get_project_search():
 @app.route("/get_project_paths", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def get_projects():
-
     response_object = {'status': 'success', "projects": [parse_str(project_paths)]}
     print("WOOP Quadrat")
     return response_object
@@ -255,16 +272,6 @@ def get_project_depr():
 
 @app.route('/project_paths', methods=["GET"])
 def add_project_paths():
-    print(request.form.keys())
-    for path in request.form.getlist("paths"):
-        print("path: ", path,)
-    print("add_project_paths ", request.form, request.values)
-    paths = request.form.get("paths")
-    if paths:
-        print(paths)
-        import shutil
-
-        # shutil.copyfile(pathlib.Path(paths), PROJECT_FILES_PATH)
     # print("add_project_paths ", request.is_json, request.args, request.data, request.files)
     import multiprocessing
     global file_pick_thread

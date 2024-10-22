@@ -124,6 +124,7 @@ class ProjectInfo:
                           depth: int, parent: typing.Optional[int]):
         is_dict = isinstance(element, dict)
         additional_data = None
+        color = None
         if is_dict:
             def unpack(key, val):
                 if isinstance(val, list):
@@ -134,7 +135,10 @@ class ProjectInfo:
                 return val.attrib["Value"]
             tag = element["tag"]
             additional_data = element.get("additional_data", [])
-            value = {key: unpack(key, elem) for key, elem in element.items() if key not in {"tag", "additional_data"}}
+            color = element.get("color", None)
+            if isinstance(color, ET.Element):
+                color = color.attrib["Value"]
+            value = {key: unpack(key, elem) for key, elem in element.items() if key not in {"tag", "additional_data", "color", "name"}}
         else:
             value = element.attrib
             tag = element.tag
@@ -145,20 +149,31 @@ class ProjectInfo:
             "depth": depth,
             "parent": parent,
             "tag": tag,
-            "additional_data": additional_data
+            "additional_data": additional_data,
+            "color": color
         }
 
     def build_master_track_info(self):
         master_track: ET.Element = self.master_track
         master_envelopes = master_track.findall("AutomationEnvelopes/Envelopes/AutomationEnvelope")
-        bpm_envelope = list(
-            filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='8']") is not None else False, master_envelopes))[0]
-        bpm_events: list = bpm_envelope.findall("Automation/Events/FloatEvent")
-        apcs = [FloatEvent(elem) for elem in bpm_events]
-        if len(apcs) > 1 or not apcs:
-            raise ValueError("multiple bpms or no bpm")
+        bpm_envelope = list(    # ToDo: Causes error for Dex-File
+            filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='8']") is not None else False, master_envelopes))
+        print(bpm_envelope)
+        if not bpm_envelope:
+            bpm_envelope = list(  # ToDo: Causes error for Dex-File
+                filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='497']") is not None else False,
+                       master_envelopes))
+        if bpm_envelope:
+            bpm_envelope = bpm_envelope[0]
+            bpm_events: list = bpm_envelope.findall("Automation/Events/FloatEvent")
+            apcs = [FloatEvent(elem) for elem in bpm_events]
+            if len(apcs) > 1 or not apcs:
+                raise ValueError("multiple bpms or no bpm")
+            bpm = apcs[0]
+        else:
+            raise ValueError("No BPM FOUND")
         return {
-            "bpm": apcs[0],
+            "bpm": bpm,
             "tag": "Master Track"
         }
 
@@ -186,6 +201,7 @@ class ProjectInfo:
         sends: list = track.findall("DeviceChain/Mixer/Sends/TrackSendHolder/Send")
         # print("SENDS:  ", sends)
         volume = track.find("DeviceChain/Mixer/Volume/Manual")
+        parent_group_id = track.find("TrackGroupId") # next(track.iter("TrackGroupId")).attrib["Value"]
         audio_output_routing = track.find("DeviceChain/AudioOutputRouting/Target")
         additional_data = [self.render_fader(value=float(pan.attrib["Value"]), min_val=-1., max_val=1, tag="Pan")]
         return {
@@ -196,6 +212,7 @@ class ProjectInfo:
             #"sends": sends,
             "volume": volume,
             "audio_output_routing": audio_output_routing,
+            "parent_group_id": parent_group_id,
             "tag": name.attrib["Value"],
             "additional_data": additional_data
         }
@@ -257,7 +274,7 @@ class NestedTable:
     def toggle_row(self, idx: int) -> bool:
         # print("toggle row ", idx)
         if not self.has_children(idx):
-            print(idx, self._rows)
+            # print(idx, self._rows)
             raise ValueError("Cant toggle row ", idx)
         if idx in self.expanded_rows:
             self.collapse_row(idx)
@@ -291,7 +308,7 @@ class NestedTable:
             raise ValueError("Invalid row", row_idx)
         target_row = self.rows[row_idx]
         # self.visible_rows.append(row_idx)
-        print("TARGET ROW ", target_row)
+        # print("TARGET ROW ", target_row)
         for _idx in reversed(range(len(self.rows))[row_idx+1:]):
             depth = target_row["depth"]
             if self.rows[_idx]["depth"] == depth - 1:
@@ -404,7 +421,7 @@ class Ableton_Project:
         self.tree = None
         self.root = None
         # self.scan_project_dir()
-        self.load_ableton_project(project_path)
+        self.is_loaded = False
 
     def build_project_info_object(self) -> ProjectInfo:
         return ProjectInfo(self.root)
@@ -424,15 +441,17 @@ class Ableton_Project:
     def scan_export_dir(self, keywords: list[str]):
         raise NotImplemented
 
-    def load(self):
-        self.load_ableton_project(self.project_path)
-        return self.tree
 
-    def load_ableton_project(self, path: pathlib.Path):
+    def load_ableton_project(self):
         from files import load_ableton_project
-        self.tree = load_ableton_project(path)
+        self.tree = load_ableton_project(self.project_path)
+        if self.tree is None:
+            self.is_loaded = False
+            return False
         self.root = self.tree.getroot()
-        return
+        self.is_loaded = True
+
+        return True
         # copy .als file, extract it and read
         import shutil
         tmp_path = pathlib.Path(TMP_DIR).joinpath(
@@ -517,10 +536,10 @@ class Ableton_Project:
             text, tail = i.text, i.tail
             text, tail = (prop.replace("\\r", "").replace("\\n", "").replace("\\t", "") if prop else None for prop in (text, tail, ))
             if text:
-                print("GOT A text for ", i)
+                # print("GOT A text for ", i)
                 r["text"] = "MYTEXT " + str(i.text)[:100]
             if tail:
-                print("GOT A tail ", tail)
+                # print("GOT A tail ", tail)
                 r["tail"] = tail
             result.append(r)
             if len(i) > 0:
@@ -615,13 +634,7 @@ class Ableton_Project:
         return tracks
 
 
-def how_to_work_with_the_script(path: str):
-    example_project = Ableton_Project(pathlib.Path(path))
-    tree = example_project.load()
-    root = example_project.tree.getroot()
-    tree.write('tmp/test.xml')
-    print(example_project)
-    return example_project.build_json_object()
+
 
 
 """

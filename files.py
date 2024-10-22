@@ -22,6 +22,12 @@ LINKED_PROJECTS = f"{USER_DATA}/linked_projects.p"
 linked_projects: dict[Path: Path] = {}
 
 
+
+def load_linked_projects():
+    global linked_projects
+    linked_projects = pickle.load(open(LINKED_PROJECTS, "rb"))
+
+
 def init():
     global PROJECT_FILES_PATH
     if not os.path.exists(TMP_DIR):
@@ -33,15 +39,14 @@ def init():
         pickle.dump(linked_projects, open(LINKED_PROJECTS, "wb"))
     if os.path.exists(PROJECT_FILES_PATH_PATH):
         PROJECT_FILES_PATH = pickle.load(open(PROJECT_FILES_PATH_PATH, "rb"))
+        print("Replaced default project path with ", PROJECT_FILES_PATH_PATH, PROJECT_FILES_PATH)
+    else:
+        print("Strange, ", PROJECT_FILES_PATH_PATH)
     load_linked_projects()
-
-
-def load_linked_projects():
-    global linked_projects
-    linked_projects = pickle.load(open(LINKED_PROJECTS, "rb"))
-
+    print("Init Files DONE")
 
 def set_project_path(new_path: str):
+    print(f"Writing {new_path} to PROJECT_FILES_PATH_PATH")
     pickle.dump(new_path, open(PROJECT_FILES_PATH_PATH, "wb"))
 
 
@@ -50,15 +55,21 @@ def save_linked_projects():
     pickle.dump(linked_projects, open(LINKED_PROJECTS, "wb"))
 
 
-def get_project_paths(file_path: str = PROJECT_FILES_PATH):
+
+
+def get_project_paths(file_path: str = None, exclude_directories=("Backup", )):
+    global PROJECT_FILES_PATH
+    if file_path is None:
+        file_path = PROJECT_FILES_PATH
     # ToDo: Preserve directory structure from original directory
     ret = []
     for directory in Path(file_path).glob('**'):
         for item in directory.iterdir():
-            if item.suffix == ".als":
-                ableton_project = item
-                os.path.getmtime(ableton_project)
-                ret.append(item)
+            if directory.name not in exclude_directories:
+                if item.suffix == ".als":
+                    ableton_project = item
+                    os.path.getmtime(ableton_project)
+                    ret.append(item)
     return ret
 
 
@@ -117,7 +128,8 @@ def load_ableton_project(path: Path):
         tree, tree_path = full_als_import(path)
         print(f"Importing unknown project: {path}")
         logger.info(f"Importing unknown project: {path}")
-    upsert_user_data(path, last_modified, tree_path)
+    if tree is not None:
+        upsert_user_data(path, last_modified, tree_path)
     return tree
 
 def full_als_import(path:Path) -> [ET.ElementTree, Path]:
@@ -136,5 +148,9 @@ def full_als_import(path:Path) -> [ET.ElementTree, Path]:
         with open(tmp_path_extract, 'w') as ff:
             s = str(file_content)[2:-1].replace("'" , '"').replace("<?" , "<").replace("?>" , ">") + "</xml>"
             ff.write(s)
-    tree = ET.parse(tmp_path_extract)
+    try:
+        tree = ET.parse(tmp_path_extract)
+    except ET.ParseError as e:
+        print(f"Could not read {path}: {e}")
+        return None, None
     return tree, tmp_path_extract

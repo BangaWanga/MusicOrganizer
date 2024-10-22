@@ -6,6 +6,7 @@
     <script src="https://unpkg.com/htmx.org@2.0.3"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
     <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
+    <link rel="stylesheet" href="{{ url_for('static', filename='ableton_colors.css') }}">
 </head>
 
 <script>
@@ -100,6 +101,7 @@
         <input id="new-project-path" name="files" type="file" webkitdirectory multiple/>
         <input id="submit-new-project-paths" type="submit"/>
     </form>
+    <button hx-get="/project_paths" hx-swap="none">New project directory</button>
     <ul id="new-file-path-list">
 
     </ul>

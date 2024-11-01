@@ -11,16 +11,14 @@ import time
 from ableton import Ableton_Project, NestedTable
 from flask_socketio import SocketIO, emit
 app = Flask(__name__)
-
 Cors = CORS(app)
 CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS=True)
-# CORS(app, resources={r'/*': {'origins': '*'}})
 
 app.config['CORS_HEADERS'] = 'Content-Type'
 socketio = SocketIO(app)
 init()
 
-XML_MODE = True
+XML_MODE = False
 project_table_url = "/project_table"
 project_table_xml_url = "/project_table_xml"
 if XML_MODE:
@@ -87,10 +85,17 @@ def project_search(search_word: str = "", project_id: int = None):
     return rows
 
 
-def get_project(project_id: int):
+def get_project(project_id: int) -> Ableton_Project:
     global ableton_projects
     assert project_id in range(len(ableton_projects))
     return ableton_projects[project_id]
+
+
+@app.route("/toggle_table_mode", methods=["GET"])
+def toggle_table_mode():
+    global XML_MODE
+    XML_MODE = not XML_MODE
+    return {"status": 200}
 
 
 @app.route("/bookmark", methods=["GET"])
@@ -158,7 +163,37 @@ def midi_devices():
 
 
 @app.route(project_table_url, methods=["GET"])
-def project_table():
+def project_table_new():
+    global nested_tables, current_table, bookmarks
+    bookmarks = set()
+    project_id = request.args.get('project_id', None)
+    search_word = request.args.get('search_word', None)
+    # search_word = ".//Buffer"
+    if str(project_id).isnumeric():
+        project_id = int(project_id)
+    else:
+        raise ValueError(f"{project_id} is not a valid project_id")
+    project = get_project(project_id=project_id)
+    if not project.is_loaded:
+        success = project.load_ableton_project()
+        if not success:
+            raise ValueError("Error when opening project: ", project.project_path)
+    """
+    nt = NestedTable(rows, project_id)  # ToDO: Does NestedTable really need id?
+    nested_tables[project_id] = nt
+    # print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
+    current_table = project_id
+    _template = nt.build_table_template()
+    return _template  # render_template("project_xml_table.html", rows=rows[:1000])
+    """
+    project_info = project.build_project_info_object()
+    print("project_info.build_tracks_args(): ", project_info.build_tracks_args())
+    from htmx_model import AbletonProjectTable, AbletonProject
+    proj_table = AbletonProjectTable(ableton_project=AbletonProject(str(project.project_path), project.last_modified, project.is_loaded), tracks=project_info.build_tracks_args(), )
+    return proj_table.render()
+
+@app.route(project_table_url + "-depr", methods=["GET"])
+def project_table_depr():
     global nested_tables, current_table, bookmarks
     bookmarks = set()
     project_id = request.args.get('project_id', None)
@@ -258,17 +293,6 @@ def get_projects():
     return response_object
 
 
-@app.route("/get_project_depr", methods=["POST"])
-@cross_origin(supports_credentials=True)
-def get_project_depr():
-    project_id = request.json["project_id"]
-    project = ableton_projects[int(project_id)]
-
-    response_object = {'status': 'success', "headers": project.get_table_headers(), "data": project.generate_display_table()}
-    for tr, idx in enumerate(project.generate_display_table()):
-        print(idx, tr)
-    return response_object
-
 
 @app.route('/project_paths', methods=["GET"])
 def add_project_paths():
@@ -290,20 +314,7 @@ def index():  # put application's code here
     return render_template("index.html", paths=project_paths, table_template=table_template)
 
 
-@app.route("/project")
-def project_view():
-    project_id = request.args.get('project_id')
-    print(project_id)
-    project = ableton_projects[int(project_id)-1]
-    return render_template("project_view.html", tracks=project.build_json_object())
 
-
-@app.route("/system")
-def system_view():
-    project_id = request.args.get('project_id')
-    print(project_id)
-    project = ableton_projects[int(project_id)-1]
-    return render_template("project_view.html", tracks=project.build_json_object())
 
 
 if __name__ == '__main__':

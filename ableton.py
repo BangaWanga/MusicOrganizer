@@ -1,7 +1,6 @@
 from __future__ import annotations
 import dataclasses
 import enum
-import os.path
 import pathlib
 import typing
 import xml.etree.ElementTree as ET
@@ -9,7 +8,7 @@ import gzip
 from ableton_project_classes import AbletonProjectClass, FloatEvent
 import flask
 import math
-
+from htmx_model import AbletonProject, AbletonTrack
 TMP_DIR = "tmp"
 
 
@@ -40,7 +39,7 @@ class Track_Type:
 class Track:
     @staticmethod
     def plug_ins(track) -> list[str]:
-        return [i.attrib["Value"] for i in track.iter("PlugName") ]
+        return [i.attrib["Value"] for i in track.iter("PlugName")]
 
     @staticmethod
     def track_type(track):
@@ -60,85 +59,77 @@ class Track:
         return {n.tag: n.attrib for n in next(track.iter("Name"))}
 
 
-@dataclasses.dataclass
-class Track_Info:
-    type: str
-    track_id: str
-    group_id: str
-    name: dict
-    sub_tracks: list
-    PlugIns: list[str]
-    is_toggled: bool
-    depth: int
-
-    def get_row_data(self, exclude_fields: tuple = ("sub_tracks" ,)):
-        # print("name: ", self.name)
-        print("plugIns: ", self.PlugIns)
-
-        base_dict = self.__dict__.copy() # [self.type, self.track_id, self.name["EffectiveName"]["Value"], str(self.PlugIns), self.is_toggled]
-        headers = self.get_headers()
-        base_dict["name"] = base_dict["name"]["EffectiveName"]["Value"]
-        for field in exclude_fields:
-            if field in self.__dict__:
-                del base_dict[field]
-        return base_dict
-
-    def get_table_data(self):
-
-        tdata = [self.get_row_data()]
-        for st in self.sub_tracks:
-            st_data = st.get_table_data()
-            tdata.extend(st_data)
-
-        return tdata
-
-    @staticmethod
-    def get_headers():
-        return ["name", "type", "track_id", "PlugIns", "group_id", "depth"]
-
-
-class ProjectInfo:
+class ProjectInfoXML:
     def __init__(self, root: ET.Element):
         self.tracks = root.find(".//Tracks")
         self.track_infos = [self.build_track_info(track) for track in self.tracks]
         self.master_track = root.find(".//MasterTrack")
         self.project = root.find(".//Ableton")
 
+    def build_tracks_args(self):
+        _tracks = self.track_infos
+        _tracks.append(self.build_master_track_info())
+        print(_tracks)
+        return _tracks
+
     def build_render_info(self):
         _rows = [self.make_render_info(self.project, idx=0, has_children=True, depth=0, parent=None),
                  self.make_render_info(element=self.tracks, idx=1, has_children=len(self.track_infos) > 0, depth=1,
                                        parent=0)]
+        depth = 2
         for track_idx, track_info in enumerate(self.track_infos):
+            has_children = track_info.get("track_type",
+                                          "") == "GroupTrack"  # any([track["parent_group_id"] for track in self.track_infos])
+            self.track_infos[track_idx]["has_children"] = has_children
+            parent = track_info.get("parent_group_id", None)
+            if parent is not None:
+                print("parent! ", parent)
+        for track_idx, track_info in enumerate(self.track_infos):
+
             _rows.append(
-                self.make_render_info(element=track_info, idx=len(_rows), has_children=False, depth=2, parent=1))
-        _rows.append(self.make_render_info(self.build_master_track_info(),  idx=len(_rows), depth=1, parent=0, has_children=False))
+                self.make_render_info(element=track_info, idx=len(_rows), has_children=track_info["has_children"],
+                                      depth=2, parent=1))
+
+        _rows.append(self.make_render_info(self.build_master_track_info(), idx=len(_rows), depth=1, parent=0,
+                                           has_children=False))
         return _rows
 
     @staticmethod
     def make_render_info(element: typing.Union[dict, ET.Element, AbletonProjectClass], idx: int, has_children: bool,
-                          depth: int, parent: typing.Optional[int]):
-        return ProjectInfo._make_render_info(element, idx, has_children, depth, parent)
+                         depth: int, parent: typing.Optional[int]):
+        return ProjectInfoXML._make_render_info(element, idx, has_children, depth, parent)
 
     @staticmethod
     def _make_render_info(element: typing.Union[dict, ET.Element, AbletonProjectClass], idx: int, has_children: bool,
                           depth: int, parent: typing.Optional[int]):
         is_dict = isinstance(element, dict)
+        print("is_dict", is_dict)
         additional_data = None
         color = None
+        plug_ins = None
         if is_dict:
             def unpack(key, val):
                 if isinstance(val, list):
-
                     # print(key, [(i.attrib, i, ) for _idx, i in enumerate(val)])
                     return {_idx: i.attrib["Value"] for _idx, i in enumerate(val)}
-                # print("Unpack value: ", val)
+                # print("Unpack value: ", val, key)
                 return val.attrib["Value"]
+
             tag = element["tag"]
             additional_data = element.get("additional_data", [])
+            plug_ins = element.get("plug_ins", [])
+            # print("plug_ins: ", plug_ins)
             color = element.get("color", None)
+            track_type = element.get("track_type", None)
+            track_id = element.get("track_id", None)
             if isinstance(color, ET.Element):
                 color = color.attrib["Value"]
-            value = {key: unpack(key, elem) for key, elem in element.items() if key not in {"tag", "additional_data", "color", "name"}}
+            value = {key: unpack(key, elem) for key, elem in element.items() if
+                     key not in {"tag", "additional_data", "color", "name", "plug_ins", "track_type", "track_id", "has_children"}}
+            value.update({
+                "track_type": track_type,
+                "track_id": track_id
+            })
         else:
             value = element.attrib
             tag = element.tag
@@ -150,17 +141,36 @@ class ProjectInfo:
             "parent": parent,
             "tag": tag,
             "additional_data": additional_data,
-            "color": color
+            "color": color,
+            "plug_ins": plug_ins,
         }
+
+    @staticmethod
+    def extract_plugin_info(node: ET.Element):
+        plugin_infos = node.findall(".//VstPluginInfo")
+        relevant_infos = []
+        for plugin_info in plugin_infos:
+            vst_version = plugin_info.find("VstVersion")
+            plug_name = plugin_info.find("PlugName")
+            plug_path = plugin_info.find("Path")
+            relevant_infos.append({
+                "vst_version": vst_version.attrib["Value"],
+                "name": plug_name.attrib["Value"],
+                "path": plug_path.attrib["Value"]
+            }
+            )
+        return relevant_infos
 
     def build_master_track_info(self):
         master_track: ET.Element = self.master_track
         master_envelopes = master_track.findall("AutomationEnvelopes/Envelopes/AutomationEnvelope")
-        bpm_envelope = list(    # ToDo: Causes error for Dex-File
-            filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='8']") is not None else False, master_envelopes))
+        bpm_envelope = list(
+            # ToDo: Find out why it's a different key in Dex-File. maybe because it is from an older version? -> Indicator for UI
+            filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='8']") is not None else False,
+                   master_envelopes))
         print(bpm_envelope)
         if not bpm_envelope:
-            bpm_envelope = list(  # ToDo: Causes error for Dex-File
+            bpm_envelope = list(  # Fix for Dex-File
                 filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='497']") is not None else False,
                        master_envelopes))
         if bpm_envelope:
@@ -172,50 +182,63 @@ class ProjectInfo:
             bpm = apcs[0]
         else:
             raise ValueError("No BPM FOUND")
+        return AbletonTrack(None, "Master", "MasterTrack", -1, "#000000", 0., .5, 1., self.extract_plugin_info(master_track), "")
+
         return {
             "bpm": bpm,
             "tag": "Master Track"
         }
 
     def render_fader(self, value: float, min_val: float, max_val: float, tag: str, sideways=True):
-        offset = (50, 50, )
-        value_norm = (value - min_val) / (max_val-min_val)
+        offset = (50, 50,)
+        value_norm = (value - min_val) / (max_val - min_val)
         return flask.render_template("fader.html", offset=offset, value=value_norm, sideways=sideways, tag=tag)
 
     def render_poti(self, value: float, min_val: float, max_val: float, ):
-        offset = (50, 50, )
+        offset = (50, 50,)
 
         r = 40
-        value_norm = (value - min_val) / (max_val-min_val)
-        a = value_norm * (2*math.pi/1)
+        value_norm = (value - min_val) / (max_val - min_val)
+        a = value_norm * (2 * math.pi / 1)
         line_pos0 = offset
-        line_pos1 = (int(offset[0] + r * math.cos(a)), int(offset[1] + r * math.sin(a)), )
+        line_pos1 = (int(offset[0] + r * math.cos(a)), int(offset[1] + r * math.sin(a)),)
         return flask.render_template("poti.html", line_pos0=line_pos0, line_pos1=line_pos1, radius=r, value=value)
 
     def build_track_info(self, track: ET.Element):
-        track_delay = track.find("TrackDelay/Value")  # has .attrib["Value"]
+        track_delay = int(track.find("TrackDelay/Value").attrib["Value"])  # has .attrib["Value"]
         # print("track_delay.attrib: ", track_delay.attrib)
-        name = track.find("Name/EffectiveName")
-        color = track.find("Color")
-        pan = track.find("DeviceChain/Mixer/Pan/Manual")
+        name = track.find("Name/EffectiveName").attrib["Value"]
+        color = track.find("Color").attrib["Value"]
+        pan = float(track.find("DeviceChain/Mixer/Pan/Manual").attrib["Value"])
         sends: list = track.findall("DeviceChain/Mixer/Sends/TrackSendHolder/Send")
         # print("SENDS:  ", sends)
-        volume = track.find("DeviceChain/Mixer/Volume/Manual")
-        parent_group_id = track.find("TrackGroupId") # next(track.iter("TrackGroupId")).attrib["Value"]
-        audio_output_routing = track.find("DeviceChain/AudioOutputRouting/Target")
-        additional_data = [self.render_fader(value=float(pan.attrib["Value"]), min_val=-1., max_val=1, tag="Pan")]
+        volume = float(track.find("DeviceChain/Mixer/Volume/Manual").attrib["Value"])
+        parent_group_id = int(track.find("TrackGroupId").attrib["Value"])  # next(track.iter("TrackGroupId")).attrib["Value"]
+        audio_output_routing = track.find("DeviceChain/AudioOutputRouting/Target").attrib["Value"]
+        track_type = track.tag
+        track_id = int(track.attrib["Id"])
+        print(track, track.tag, track.attrib)
+        # ToDo: Extract value right here
+        # Create some visual representations and store as <additional_data> to include it as rendered html
+        # additional_data = [self.render_fader(value=float(pan.attrib["Value"]), min_val=-1., max_val=1, tag="Pan")]
+
+        return AbletonTrack(track_id, name, track_type, parent_group_id, color, track_delay, pan, volume, self.extract_plugin_info(track), audio_output_routing)
         return {
-            "track_delay": track_delay,
-            "name": name,
-            "color": color,
-            "pan": pan,
-            #"sends": sends,
-            "volume": volume,
-            "audio_output_routing": audio_output_routing,
-            "parent_group_id": parent_group_id,
+            "track_delay": track_delay.attrib["Value"],
+            "name": name.attrib["Value"],
+            "color": color.attrib["Value"],
+            "pan": pan.attrib["Value"],
+            # "sends": sends,
+            "volume": volume.attrib["Value"],
+            "audio_output_routing": audio_output_routing.attrib["Value"],
+            "parent_group_id": parent_group_id.attrib["Value"],
             "tag": name.attrib["Value"],
-            "additional_data": additional_data
+            "additional_data": additional_data,
+            "plug_ins": self.extract_plugin_info(track),
+            "track_type": track_type,
+            "track_id": track_id
         }
+
 
 class NestedTable:
     def __init__(self, rows: list[dict[str, typing.Any]], project_id: int, ):
@@ -248,7 +271,7 @@ class NestedTable:
             if not new_rows:
                 raise ValueError("No new rows available")
             rows = new_rows
-        #print(rows)
+        # print(rows)
         row_templates = [flask.render_template("project_xml_row.html", row=row, project_id=self.project_id,
                                                additionals=row.get("additional_data", None)) for row in rows]
         row_group = flask.render_template("row-group.html", idx=group_idx, rows=row_templates)
@@ -256,7 +279,7 @@ class NestedTable:
 
     def build_table_template(self) -> str:
         if self.visible_rows:
-            rows = None# [self._rows[idx] for idx in self.visible_rows]
+            rows = None  # [self._rows[idx] for idx in self.visible_rows]
             # rows = [row for row in rows if "text" in row]
         else:
             print("Project INIT")
@@ -302,14 +325,14 @@ class NestedTable:
         raise NotImplemented("This is buggy")
         # open arbitrary row, let the code handle the rest
         row_path = []
-        if row_idx in self.visible_rows:    # that means, the row has a parent assigned to it
-            raise NotImplemented    # too tired..
+        if row_idx in self.visible_rows:  # that means, the row has a parent assigned to it
+            raise NotImplemented  # too tired..
         elif 0 > row_idx or row_idx >= len(self._rows):
             raise ValueError("Invalid row", row_idx)
         target_row = self.rows[row_idx]
         # self.visible_rows.append(row_idx)
         # print("TARGET ROW ", target_row)
-        for _idx in reversed(range(len(self.rows))[row_idx+1:]):
+        for _idx in reversed(range(len(self.rows))[row_idx + 1:]):
             depth = target_row["depth"]
             if self.rows[_idx]["depth"] == depth - 1:
                 self.expanded_rows.add(_idx)
@@ -327,9 +350,7 @@ class NestedTable:
         self.visible_rows.extend(indices)
         return list(reversed(row_path))
 
-    def row_obj(self, idx: int, tag: str, ):
-        return {
-        }
+
     def test_table(self):
         for row_idx, row in enumerate(self.rows):
             if self.has_children(row_idx):
@@ -352,12 +373,12 @@ class NestedTable:
                 self._new_rows.append(row)
                 self.visible_rows.append(row_idx)
             elif row_depth <= depth:
-                #print(idx, row_idx, self.rows[row_idx])
+                # print(idx, row_idx, self.rows[row_idx])
                 break
-        #print(f"init table with {len(self._new_rows)} rows: {[row['idx'] for row in self._new_rows]}")
+        # print(f"init table with {len(self._new_rows)} rows: {[row['idx'] for row in self._new_rows]}")
 
     def collapse_row(self, idx: int, nested: bool = False):
-        #print("Collapse row ", idx, nested, len(self.visible_rows))
+        # print("Collapse row ", idx, nested, len(self.visible_rows))
         self.expanded_rows.remove(idx)
         expanded_children = [row_idx for row_idx in self.expanded_rows if row_idx > 0 and
                              self._rows[row_idx]["parent"] == idx]
@@ -367,7 +388,7 @@ class NestedTable:
             self.visible_rows.remove(idx)
         self._rows[idx].update({"is_expanded": False})
         depth = self._rows[idx]["depth"]
-        for row_idx in self.visible_rows:   # ToDo: Only iterate over visible rows
+        for row_idx in self.visible_rows:  # ToDo: Only iterate over visible rows
             if self._rows[row_idx]["depth"] <= depth:
                 break
             parent = self._rows[row_idx].get("parent", None)
@@ -391,9 +412,9 @@ class NestedTable:
             }
         ]
         for _idx, project in enumerate(projects):
-
-            row = NestedTable.convert_ableton_project_to_row(project=project, idx=_idx+1, page_link=page_link + f"?project_id={_idx}",
-                                                   depth=1, parent=0, has_children=False)
+            row = NestedTable.convert_ableton_project_to_row(project=project, idx=_idx + 1,
+                                                             page_link=page_link + f"?project_id={_idx}",
+                                                             depth=1, parent=0, has_children=False)
             rows.append(row)
         return NestedTable(rows, nested_table_id)
 
@@ -423,8 +444,8 @@ class Ableton_Project:
         # self.scan_project_dir()
         self.is_loaded = False
 
-    def build_project_info_object(self) -> ProjectInfo:
-        return ProjectInfo(self.root)
+    def build_project_info_object(self) -> ProjectInfoXML:
+        return ProjectInfoXML(self.root)
 
     def __str__(self):
         return f"\nAbletonProject\nproj-path: {self.project_path}\nexports: {self.exports}\nproj-files: {self.project_files}"
@@ -441,10 +462,11 @@ class Ableton_Project:
     def scan_export_dir(self, keywords: list[str]):
         raise NotImplemented
 
-
     def load_ableton_project(self):
         from files import load_ableton_project
-        self.tree = load_ableton_project(self.project_path)
+        tree, last_modified = load_ableton_project(self.project_path)
+        self.tree = tree
+        self.last_modified = last_modified
         if self.tree is None:
             self.is_loaded = False
             return False
@@ -455,18 +477,18 @@ class Ableton_Project:
         # copy .als file, extract it and read
         import shutil
         tmp_path = pathlib.Path(TMP_DIR).joinpath(
-            str(path.stem) + "-tmp" + ".gz"   #str(path.stem)[-len(path.suffix):]
+            str(path.stem) + "-tmp" + ".gz"  # str(path.stem)[-len(path.suffix):]
         )
 
         tmp_path_extract = pathlib.Path(TMP_DIR).joinpath(
-            str(path.stem) + "_tmp_extract_.xml" # + str(path.stem)[-len(path.suffix):]
+            str(path.stem) + "_tmp_extract_.xml"  # + str(path.stem)[-len(path.suffix):]
         )
         shutil.copyfile(path, tmp_path)
 
         with gzip.open(tmp_path, 'rb') as f:
             file_content = f.read()
             with open(tmp_path_extract, 'w') as ff:
-                s = str(file_content)[2:-1].replace("'" , '"').replace("<?" , "<").replace("?>" , ">") + "</xml>"
+                s = str(file_content)[2:-1].replace("'", '"').replace("<?", "<").replace("?>", ">") + "</xml>"
                 ff.write(s)
         self.tree = ET.parse(tmp_path_extract)
         self.root = self.tree.getroot()
@@ -479,7 +501,7 @@ class Ableton_Project:
             exclude_list = set()
         if search_list is None:
             search_list = set()
-        self._iter_print(self.root, 0, exclude_list,search_list, search_for_occurence)
+        self._iter_print(self.root, 0, exclude_list, search_list, search_for_occurence)
 
     @staticmethod
     def _iter_print(node, depth: int, exclude_list: typing.Iterable, search_list: typing.Iterable,
@@ -492,7 +514,7 @@ class Ableton_Project:
                 if i.tag not in search_list or i.tag in exclude_list:
                     continue
 
-            #print("\t\t" * depth, i.tag, i.attrib, depth)
+            # print("\t\t" * depth, i.tag, i.attrib, depth)
             if len(i) > 0:
                 Ableton_Project._iter_print(i, depth + 1, search_list, exclude_list, search_for_occurence)
 
@@ -509,12 +531,6 @@ class Ableton_Project:
         else:
             node = self.root
         return self._rec_search(node, 0, exclude_list, set(), search_for_occurence)
-
-    def _rec_search2(self, depth: int, exclude_list: typing.Iterable, search_list: typing.Iterable):
-        result = []
-        nodes = self.root.findall(search_list)
-        print(nodes)
-
 
     @staticmethod
     def _rec_search(node, depth: int, exclude_list: typing.Iterable, search_list: typing.Iterable,
@@ -534,7 +550,8 @@ class Ableton_Project:
                 r["value"] = i.attrib["Value"]
 
             text, tail = i.text, i.tail
-            text, tail = (prop.replace("\\r", "").replace("\\n", "").replace("\\t", "") if prop else None for prop in (text, tail, ))
+            text, tail = (prop.replace("\\r", "").replace("\\n", "").replace("\\t", "") if prop else None for prop in
+                          (text, tail,))
             if text:
                 # print("GOT A text for ", i)
                 r["text"] = "MYTEXT " + str(i.text)[:100]
@@ -545,95 +562,6 @@ class Ableton_Project:
             if len(i) > 0:
                 result += Ableton_Project._rec_search(i, depth + 1, exclude_list, search_list, search_for_occurence)
         return result
-
-    @staticmethod
-    def get_next_by_tag(node: ET.ElementTree, tag: str):
-        return next(node.iter(tag))
-
-    def get_tracks(self):
-        return next(self.root.iter("Tracks"))
-
-    @staticmethod
-    def get_group_id_from_track(track: ET.Element):
-        """
-        Returns IDs for all Ableton-groups
-        :return:
-        :rtype:
-        """
-        return next(track.iter("TrackGroupId")).attrib["Value"]
-
-    def get_table_headers(self):
-        return Track_Info.get_headers()
-
-    def generate_display_table(self):
-        tracks = self.get_track_objects()
-        table_data = []
-        for t in tracks:
-            for row in t.get_table_data():
-                table_data.append(row)
-        return table_data
-
-    def get_track_objects(self):
-        tracks = []
-        track_nodes = self.get_tracks()
-        for t in track_nodes:
-            track_type = Track.track_type(t)
-            group_id = Track.group_id(t)  # self.get_group_id_from_track(t)
-            name = Track.name(t)  # {n.tag: n.attrib for n in next(t.iter("Name"))}
-            plug_ins = Track.plug_ins(t)
-            track_info = Track_Info(
-                type=track_type ,
-                track_id=t.attrib["Id"],
-                group_id=group_id,
-                name=name,
-                sub_tracks=[],
-                PlugIns=plug_ins,
-                is_toggled= group_id == "-1",
-                depth=0
-            )
-            if group_id == "-1":
-                tracks.append(track_info)
-            else:
-                def rec_grouper(child, parent: Track_Info):
-                    if child.group_id == parent.track_id:
-                        child.depth = parent.depth + 1
-                        parent.sub_tracks.append(child)
-                    else:
-                        parent.sub_tracks = [rec_grouper(child, p, ) for p in parent.sub_tracks]
-                    return parent
-
-                tracks = [rec_grouper(track_info, t) for t in tracks]
-        return tracks
-
-    def build_json_object(self):
-        tracks = []
-        track_nodes = self.get_tracks()
-        for t in track_nodes:
-            track_type = Track.track_type(t)
-            group_id = Track.group_id(t) # self.get_group_id_from_track(t)
-            name = Track.name(t) # {n.tag: n.attrib for n in next(t.iter("Name"))}
-            plug_ins = Track.plug_ins(t)
-            track_info = {
-                    "type": track_type,
-                    "track_id": t.attrib["Id"],
-                    "group_id": group_id,
-                    "name": name,
-                    "sub_tracks": [],
-                    "PlugIns": plug_ins
-            }
-            if group_id == "-1":
-                tracks.append(track_info)
-            else:
-                def rec_grouper(child, parent):
-                    if child["group_id"] == parent["track_id"]:
-                        parent["sub_tracks"].append(child)
-                    else:
-                        parent["sub_tracks"] = [rec_grouper(child, p) for p in parent["sub_tracks"]]
-                    return parent
-                tracks = [rec_grouper(track_info, t) for t in tracks]
-        return tracks
-
-
 
 
 
@@ -651,17 +579,16 @@ def some_interesting_code():
     # returns: {None, <class 'dict'>, <class 'str'>}
 """
 
-
 if __name__ == "__main__":
     from files import get_project_paths
+
     project_paths = get_project_paths()
     if project_paths:
-
         path = project_paths[0]
         tracks = how_to_work_with_the_script(path)
         ableton_project = Ableton_Project(pathlib.Path(path))
         # Find tags in project with iter_print-method
-        ableton_project.iter_print(search_list=("Session", ), search_for_occurence=True)
+        ableton_project.iter_print(search_list=("Session",), search_for_occurence=True)
     # interesting row: 177144 (Take Lanes. There is no value  
     print("No paths found")
 

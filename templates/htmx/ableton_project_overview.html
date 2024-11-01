@@ -1,0 +1,21 @@
+
+
+<table>
+    <thead>
+        <tr>
+            {% for head in header %}
+                <td>{{ head }}</td>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for track in tracks %}
+                <tr class="track-info ">
+                    {% for project in ableton_projects %}
+                        <td >{{ project[head] }} </td>
+                    {% endfor %}
+                </tr>
+        {% endfor %}
+    </tbody>
+</table>
+

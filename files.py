@@ -28,7 +28,7 @@ def load_linked_projects():
     linked_projects = pickle.load(open(LINKED_PROJECTS, "rb"))
 
 
-def init():
+def init(): # ToDo Maybe call with import? Or move to directory and call in __init__ file?
     global PROJECT_FILES_PATH
     if not os.path.exists(TMP_DIR):
         os.mkdir(TMP_DIR)
@@ -107,7 +107,7 @@ def upsert_user_data(project_path: Path, last_modified: float, tree_path: Path, 
     save_linked_projects()
 
 
-def load_ableton_project(path: Path):
+def load_ableton_project(path: Path) -> tuple:
     # copy .als file, extract it and read
     if not os.path.exists(path):
         raise ValueError("Invalid path for ableton project")
@@ -122,7 +122,7 @@ def load_ableton_project(path: Path):
         else:
             print(f"Loading project from cache: {path}")
             logger.info(f"Loading project from cache: {path}")
-            return ET.parse(user_data["tree_path"])
+            return ET.parse(user_data["tree_path"]), last_modified
 
     else:
         tree, tree_path = full_als_import(path)
@@ -130,7 +130,8 @@ def load_ableton_project(path: Path):
         logger.info(f"Importing unknown project: {path}")
     if tree is not None:
         upsert_user_data(path, last_modified, tree_path)
-    return tree
+    return tree, last_modified
+
 
 def full_als_import(path:Path) -> [ET.ElementTree, Path]:
     print(path)

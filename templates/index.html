@@ -20,29 +20,29 @@
         console.log("No SUCCESS!")
 
     }
-    readNewFiles = function(){
+    readNewFiles = function () {
         let files = document.getElementById("files").files;
-        for (let file = 0 ; file < files.length; file++) {
+        for (let file = 0; file < files.length; file++) {
 
         }
     }
-    get_project_paths = function(event) {
+    get_project_paths = function (event) {
         let project_paths = []
         for (const file of event.target.files) {
             project_paths.push(file.webkitRelativePath)
-            console.log("GETO ", file, )
+            console.log("GETO ", file,)
         }
-        console.log("project_paths:" , project_paths);
+        console.log("project_paths:", project_paths);
         return project_paths;
     }
-    add_project_paths = function(event) {
-            let output = document.getElementById("new-file-path-list");
-            for (const file of event.target.files) {
-                let item = document.createElement("li");
-                item.textContent = file.webkitAbsolutePath;
-                console.log("ITEM ", item);
-                output.appendChild(item);
-            }
+    add_project_paths = function (event) {
+        let output = document.getElementById("new-file-path-list");
+        for (const file of event.target.files) {
+            let item = document.createElement("li");
+            item.textContent = file.webkitAbsolutePath;
+            console.log("ITEM ", item);
+            output.appendChild(item);
+        }
     }
     if (typeof bookmarked_element === "undefined") {
         let bookmarked_element = null;
@@ -50,16 +50,16 @@
     }
     let selectedDataPoint = null
 
-    setInfobox = function (text, button_id){
+    setInfobox = function (text, button_id) {
         console.log("setInfobox ", button_id);
-        if (! button_id || !document.getElementById(button_id)){
+        if (!button_id || !document.getElementById(button_id)) {
             return;
-        }else{
+        } else {
             new_bookmarked_element = document.getElementById(button_id)
             console.log("Found ELement!: ", button_id);
 
             new_bookmarked_element.classList.add("active-bookmark");
-            if (selectedDataPoint !== null && selectedDataPoint !== undefined){
+            if (selectedDataPoint !== null && selectedDataPoint !== undefined) {
                 console.log("Removing class from ", selectedDataPoint)
                 bookmarked_element = document.getElementById(selectedDataPoint)
                 bookmarked_element.classList.remove("active-bookmark");
@@ -67,8 +67,8 @@
             selectedDataPoint = button_id;
         }
 
-     htmx.swap('#info-box', text, {swapStyle: 'innerHTML'})
-}
+        htmx.swap('#info-box', text, {swapStyle: 'innerHTML'})
+    }
 
 </script>
 <body>
@@ -90,8 +90,11 @@
 </style>
 
 <a href="/" class="button" id="home-btn">
-    <span ><h3>HOME</h3></span>
+    <span><h3>HOME</h3></span>
 </a>
+<button hx-get="/toggle_table_mode" hx-swap="none" class="button" id="home-btn">
+    <span><h3>Toggle Table Mode</h3></span>
+</button>
 
 <div id="new-project-picker">
 
@@ -123,15 +126,17 @@
 </div>
 </body>
 <style>
-    #home-btn{
+    #home-btn {
         min-width: 5em;
         max-width: 5em;
-        background-color: #6cdbfc;
+        background-color: rgb(206, 224, 232);
         text-align: center;
     }
 
     .project-table {
         display: block;
+        {#background: rgba(168, 185, 199, 0.98);#}
+        backdrop-filter: blur(10px);
     }
 
     #info-box {
@@ -140,11 +145,23 @@
         overflow: auto;
         overflow-wrap: break-word;
     }
-    #bookmarks{
+
+    #bookmarks {
         min-width: 10em;
         max-width: 10em;
         overflow: auto;
     }
+    body {
+        {#background-image: url('static/img/background.png');#}
+        background-size: 900px;
+    }
+
+    th, td {
+      border: 1px solid #a1fffd;
+      border-radius: 5px;
+    }
+
+
 </style>
 
 
@@ -153,7 +170,7 @@
     document.getElementById("submit-new-project-paths").addEventListener('click', async () => {
         // Destructure the one-element array.
         textArea = document.getElementById("textArea")
-        [fileHandle] = await window.showOpenFilePicker();
+            [fileHandle] = await window.showOpenFilePicker();
         const file = await fileHandle.getFile();
         textArea.value = await file.text();
 

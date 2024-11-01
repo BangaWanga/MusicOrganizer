@@ -86,6 +86,14 @@
                 {{ add | safe }}
             {% endfor %}
         {% endif %}
-
+        <!-- move to additional data in the future! -->
+        {% if row.plug_ins %}
+            <ul>PlugIns:</ul>
+            {% for plug_in in row.plug_ins  %}
+                <ul>
+                    <span> Name: {{ plug_in.name }} VST-Version: {{ plug_in.vst_version }}</span>
+                </ul>
+            {% endfor %}
+        {% endif %}
     </div>
 </div>

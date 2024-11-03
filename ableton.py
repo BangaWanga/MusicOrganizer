@@ -64,13 +64,14 @@ class Track:
 class ProjectInfoXML:
     def __init__(self, root: ET.Element):
         self.tracks = root.find(".//Tracks")
-        self.track_infos = [self.build_track_info(track) for track in self.tracks]
         self.master_track = root.find(".//MasterTrack")
         self.project = root.find(".//Ableton")
 
+        self.track_infos = [self.build_track_info(track) for track in self.tracks]
+        self.track_infos.append(self.build_master_track_info())
+
     def build_tracks_args(self) -> list[AbletonTrack]:
         _tracks = self.track_infos
-        _tracks.append(self.build_master_track_info())
         # print(_tracks)
         return _tracks
 

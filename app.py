@@ -122,6 +122,17 @@ def toggle_table_mode():
     return {"status": 200}
 
 
+def toggle_track(project, parent_group_id, collapse: bool, force_invisible=False):
+    for i in range(len(project.project_info.track_infos)):
+        if project.project_info.track_infos[i].parent_group_id == parent_group_id:
+            if force_invisible:
+                project.project_info.track_infos[i].is_visible = False
+            else:
+                project.project_info.track_infos[i].is_visible = not project.project_info.track_infos[i].is_visible
+            if collapse and project.project_info.track_infos[i].track_type == "GroupTrack":
+                project = toggle_track(project, project.project_info.track_infos[i].track_id, collapse, True)
+    return project
+
 @app.route("/toggle-group-track", methods=["GET"])
 def toggle_group_track():
     global ableton_projects
@@ -135,9 +146,10 @@ def toggle_group_track():
     track_id = int(track_id)
     project_id = int(project_id)
     project = ableton_projects[project_id]
-    for i in range(len(project.project_info.track_infos)):
-        if project.project_info.track_infos[i].parent_group_id == track_id:
-            project.project_info.track_infos[i].is_visible = not project.project_info.track_infos[i].is_visible
+    if project.project_info.track_infos:
+        collapse = project.project_info.track_infos[0].is_visible
+        project = toggle_track(project, track_id, collapse)
+
     proj_table = AbletonProjectTable(ableton_project=project.model, tracks=project.project_info.build_tracks_args(), project_idx=project_id)
     return proj_table.render()
 

@@ -7,8 +7,9 @@ from flask_cors import CORS, cross_origin
 import flask
 from flask import Flask, render_template, request, jsonify
 import time
+from htmx_model import AbletonProjectTable, AbletonProject, AbletonProjectOverview
 
-from ableton import Ableton_Project, NestedTable
+from ableton import Ableton_Project, NestedTable, ProjectInfoXML
 from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 Cors = CORS(app)
@@ -25,7 +26,9 @@ if XML_MODE:
     project_table_url = "/project_table_"
     project_table_xml_url = "/project_table"
 
+visible_rows = []
 ableton_projects: list[Ableton_Project] = []
+
 project_paths: list[pathlib.Path] = get_project_paths()
 nested_tables: dict[int, NestedTable] = dict()
 bookmarks = set()
@@ -39,8 +42,8 @@ current_table: typing.Optional[int] = None
 file_pick_thread = None
 
 def load_projects():
+    print("LOAD ABLETON PROJECTS")
     global ableton_projects
-    ableton_projects = []
     for path in project_paths:
         ableton_projects.append(Ableton_Project(path))
 
@@ -58,9 +61,10 @@ def OpenFileDialog():
     set_project_path(file_path)
 
 
-@app.route('/reload_projects')
+@app.route('/reload')
 def reload_projects():
     load_projects()
+    return flask.redirect("/")
 
 
 @app.route('/test')
@@ -84,11 +88,31 @@ def project_search(search_word: str = "", project_id: int = None):
     rows = project.rec_search(search_word=search_word, search_for_occurence=True)
     return rows
 
+def load_all_projects():
+    for project_idx in range(len(ableton_projects)):
+        try:
+            _ = get_project(project_idx)
+        except ValueError as e:
+            print("Failed loading project: ", e)
+
 
 def get_project(project_id: int) -> Ableton_Project:
     global ableton_projects
     assert project_id in range(len(ableton_projects))
-    return ableton_projects[project_id]
+    project = ableton_projects[project_id]
+    if not project.is_loaded:
+        success = project.load_ableton_project()
+        ableton_projects[project_id] = project  # maybe do all of this in a <load-project>-function?
+        if not success:
+            raise ValueError("Error when opening project: ", project.project_path)
+    project.build_project_info_object()
+    return project
+
+
+@app.route("/load-selected-projects", methods=["GET"])
+def load_selected_projects():
+    load_all_projects()
+    return flask.redirect("/")
 
 
 @app.route("/toggle_table_mode", methods=["GET"])
@@ -96,6 +120,26 @@ def toggle_table_mode():
     global XML_MODE
     XML_MODE = not XML_MODE
     return {"status": 200}
+
+
+@app.route("/toggle-group-track", methods=["GET"])
+def toggle_group_track():
+    global ableton_projects
+    project_id = request.args.get('project_idx', None)
+    track_id = request.args.get('track_id', None)
+
+    if track_id is None or project_id is None:
+        raise ValueError("Parameter missing")
+    elif not track_id.isdigit() or not track_id.isdigit():
+        raise ValueError("Invalid parameter")
+    track_id = int(track_id)
+    project_id = int(project_id)
+    project = ableton_projects[project_id]
+    for i in range(len(project.project_info.track_infos)):
+        if project.project_info.track_infos[i].parent_group_id == track_id:
+            project.project_info.track_infos[i].is_visible = not project.project_info.track_infos[i].is_visible
+    proj_table = AbletonProjectTable(ableton_project=project.model, tracks=project.project_info.build_tracks_args(), project_idx=project_id)
+    return proj_table.render()
 
 
 @app.route("/bookmark", methods=["GET"])
@@ -123,29 +167,6 @@ def bookmark():
 
     return render_template("bookmark.html", tag=tag, row=row, value=value)
 
-
-@app.route("/send_midi_signal", methods=["Get", "POST"])
-@cross_origin(headers=['Content-Type'])
-def send_midi_signal():
-    global midi_port
-    print("Sending Tone ", request.args, request.form, request.values)
-    note = request.form.get("note", None)
-    velocity = request.form.get("velocity", None)
-    assert note is not None and note.isnumeric()
-    assert velocity is not None and velocity.isnumeric()
-    note, velocity = int(note), int(velocity)
-    assert 0 < note < 128
-    assert 0 < velocity < 128
-
-    channel = 0
-    note_on = MIDI_Type.Note_On(channel, note, velocity)
-    note_off = MIDI_Type.Note_Off(channel, note, velocity)
-    midi_port.send(note_on, )
-    time.sleep(0.5)
-    midi_port.send(note_off,)
-    return {"status": 200}
-
-
 @app.route("/midi_device", methods=["GET"])
 def midi_device():
     global midi_port, port
@@ -164,7 +185,7 @@ def midi_devices():
 
 @app.route(project_table_url, methods=["GET"])
 def project_table_new():
-    global nested_tables, current_table, bookmarks
+    global nested_tables, current_table, bookmarks, ableton_projects
     bookmarks = set()
     project_id = request.args.get('project_id', None)
     search_word = request.args.get('search_word', None)
@@ -174,10 +195,6 @@ def project_table_new():
     else:
         raise ValueError(f"{project_id} is not a valid project_id")
     project = get_project(project_id=project_id)
-    if not project.is_loaded:
-        success = project.load_ableton_project()
-        if not success:
-            raise ValueError("Error when opening project: ", project.project_path)
     """
     nt = NestedTable(rows, project_id)  # ToDO: Does NestedTable really need id?
     nested_tables[project_id] = nt
@@ -186,64 +203,11 @@ def project_table_new():
     _template = nt.build_table_template()
     return _template  # render_template("project_xml_table.html", rows=rows[:1000])
     """
-    project_info = project.build_project_info_object()
-    print("project_info.build_tracks_args(): ", project_info.build_tracks_args())
-    from htmx_model import AbletonProjectTable, AbletonProject
-    proj_table = AbletonProjectTable(ableton_project=AbletonProject(str(project.project_path), project.last_modified, project.is_loaded), tracks=project_info.build_tracks_args(), )
+    #print("project_info.build_tracks_args(): ", project_info.build_tracks_args())
+    proj_table = AbletonProjectTable(ableton_project=project.model, tracks=project.project_info.build_tracks_args(), project_idx=project_id)
+    # AbletonProject(str(project.project_path), project.last_modified, project.is_loaded,
+    #                                   project.is_cached, project.meta),
     return proj_table.render()
-
-@app.route(project_table_url + "-depr", methods=["GET"])
-def project_table_depr():
-    global nested_tables, current_table, bookmarks
-    bookmarks = set()
-    project_id = request.args.get('project_id', None)
-    search_word = request.args.get('search_word', None)
-    # search_word = ".//Buffer"
-    if str(project_id).isnumeric():
-        project_id = int(project_id)
-    else:
-        raise ValueError(f"{project_id} is not a valid project_id")
-    project = get_project(project_id=project_id)
-    if not project.is_loaded:
-        success = project.load_ableton_project()
-        if not success:
-            raise ValueError("Error when opening project: ", project.project_path)
-    project_info = project.build_project_info_object()
-    rows = project_info.build_render_info()
-    nt = NestedTable(rows, project_id)  # ToDO: Does NestedTable really need id?
-    nested_tables[project_id] = nt
-    # print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
-    current_table = project_id
-    _template = nt.build_table_template()
-    return _template    # render_template("project_xml_table.html", rows=rows[:1000])
-
-
-@app.route(project_table_xml_url, methods=["GET"])
-def project_table_xml():
-
-    global nested_tables, current_table, bookmarks
-    bookmarks = set()
-    project_id = request.args.get('project_id', None)
-    search_word = request.args.get('search_word', None)
-    # search_word = ".//Buffer"
-    if str(project_id).isnumeric():
-        project_id = int(project_id)
-    else:
-        raise ValueError(f"{project_id} is not a valid project_id")
-
-    if project_id in nested_tables and False:   # Deactivated persistent projects. table gets rebuilt every time
-        nt: NestedTable = nested_tables[project_id]
-        current_table = project_id
-        return nt.build_table_template()
-    else:
-        rows = project_search(search_word, project_id)
-        nt = NestedTable(rows, project_id)
-        # nt.open_row(70248)
-        nested_tables[project_id] = nt
-        # print("Found ", len(rows), " rows with size ", sys.getsizeof(rows))
-        current_table = project_id
-        _template = nt.build_table_template()
-        return _template # render_template("project_xml_table.html", rows=rows[:1000])
 
 
 @app.route("/toggle_row", methods=["GET"])
@@ -293,7 +257,6 @@ def get_projects():
     return response_object
 
 
-
 @app.route('/project_paths', methods=["GET"])
 def add_project_paths():
     # print("add_project_paths ", request.is_json, request.args, request.data, request.files)
@@ -303,17 +266,52 @@ def add_project_paths():
     file_pick_thread.start()
     return flask.render_template("project_selection.html", )
 
+
 @app.route('/')
 def index():  # put application's code here
-    load_projects()
+    # load_projects()
     global ableton_projects, nested_tables
     nt_id = len(nested_tables)
     nt = NestedTable.from_ableton_project_list(ableton_projects, page_link="project_table", nested_table_id=nt_id)
     nested_tables[nt_id] = nt
-    table_template = nt.build_table_template()
+    proj_tables = []
+    for project in ableton_projects:
+        if project.is_loaded:   # ToDo: Handle if not loaded? Maybe load all projects on load? Maybe some picked ones?
+            project.build_project_info_object()
+            # print("project_info.build_tracks_args(): ", project_info.build_tracks_args())
+            tracks = project.project_info.build_tracks_args()
+            for track in tracks:
+                project.update_contains_vst2(track.plug_ins)
+        proj_tables.append(project.model)   # AbletonProject(str(project.project_path), project.last_modified, project.is_loaded, project.is_cached))
+    proj_overview_table = AbletonProjectOverview(ableton_projects=proj_tables)
+    table_template = proj_overview_table.render()
+    # print(proj_tables)
+    # print("table_template: ", table_template)
     return render_template("index.html", paths=project_paths, table_template=table_template)
 
 
+
+# @app.route("/send_midi_signal", methods=["Get", "POST"])
+# @cross_origin(headers=['Content-Type'])
+# def send_midi_signal():
+#     global midi_port
+#     print("Sending Tone ", request.args, request.form, request.values)
+#     note = request.form.get("note", None)
+#     velocity = request.form.get("velocity", None)
+#     assert note is not None and note.isnumeric()
+#     assert velocity is not None and velocity.isnumeric()
+#     note, velocity = int(note), int(velocity)
+#     assert 0 < note < 128
+#     assert 0 < velocity < 128
+#
+#     channel = 0
+#     note_on = MIDI_Type.Note_On(channel, note, velocity)
+#     note_off = MIDI_Type.Note_Off(channel, note, velocity)
+#     midi_port.send(note_on, )
+#     time.sleep(0.5)
+#     midi_port.send(note_off,)
+#     return {"status": 200}
+#
 
 
 

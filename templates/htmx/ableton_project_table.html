@@ -1,6 +1,6 @@
 
 
-<table>
+<table id="ableton-project-table">
     <thead>
         <tr>
             {% for head in header %}
@@ -10,7 +10,12 @@
     </thead>
     <tbody>
         {% for track in tracks %}
-                <tr class="track-info ">
+                <tr class="track-info"
+                {% if not track.is_visible %} style="visibility: collapse;"{% endif %}
+                hx-get="/toggle-group-track?track_id={{ track.track_id }}&project_idx={{ project_idx }}"
+                    hx-target="#ableton-project-table"
+                hx-swap="outerHTML"
+                >
                     {% for head in header %}
                         <td class="ableton-col-{{ track.color }}">{{ track[head] }} </td>
                     {% endfor %}

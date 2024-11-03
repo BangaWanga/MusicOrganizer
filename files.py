@@ -1,3 +1,4 @@
+import datetime
 import typing
 from pathlib import Path
 import pickle
@@ -22,7 +23,6 @@ LINKED_PROJECTS = f"{USER_DATA}/linked_projects.p"
 linked_projects: dict[Path: Path] = {}
 
 
-
 def load_linked_projects():
     global linked_projects
     linked_projects = pickle.load(open(LINKED_PROJECTS, "rb"))
@@ -45,6 +45,7 @@ def init(): # ToDo Maybe call with import? Or move to directory and call in __in
     load_linked_projects()
     print("Init Files DONE")
 
+
 def set_project_path(new_path: str):
     print(f"Writing {new_path} to PROJECT_FILES_PATH_PATH")
     pickle.dump(new_path, open(PROJECT_FILES_PATH_PATH, "wb"))
@@ -53,8 +54,6 @@ def set_project_path(new_path: str):
 def save_linked_projects():
     global linked_projects
     pickle.dump(linked_projects, open(LINKED_PROJECTS, "wb"))
-
-
 
 
 def get_project_paths(file_path: str = None, exclude_directories=("Backup", )):
@@ -76,7 +75,7 @@ def get_project_paths(file_path: str = None, exclude_directories=("Backup", )):
 def get_user_data_for_path(path: Path) -> typing.Optional[typing.Tuple[dict, Path]]:
     global linked_projects
 
-    print("linked_projects: ", linked_projects)
+    # print("linked_projects: ", linked_projects)
     info_path = linked_projects.get(path)
     if info_path:
         return pickle.load(open(info_path, "rb")), info_path
@@ -91,9 +90,8 @@ def new_project_info_path()-> Path:
 def upsert_user_data(project_path: Path, last_modified: float, tree_path: Path, user_inputs: dict = None):
     global linked_projects
     user_data = get_user_data_for_path(project_path)
-    if user_inputs is None:
-        user_inputs = {}
     if user_data is None:
+        user_inputs = {}
         project_info = {
             "last_modified": last_modified,
             "tree_path": tree_path,
@@ -107,11 +105,27 @@ def upsert_user_data(project_path: Path, last_modified: float, tree_path: Path, 
     save_linked_projects()
 
 
+def get_last_modified(path)-> float:
+    file_stat = os.stat(path)
+    last_modified = datetime.datetime.fromtimestamp(file_stat.st_mtime)
+    last_access = datetime.datetime.fromtimestamp(file_stat.st_atime)
+    file_size_bytes = file_stat.st_size
+    file_size_bytes_str = str(file_size_bytes)
+    file_size = f"{file_size_bytes} b"
+    if 3 <= len(file_size_bytes_str) < 6:
+        file_size = f"{file_size_bytes / 3} kb"
+    elif len(file_size_bytes_str) > 6:
+        file_size = f"{file_size_bytes / 6} mb"
+    if not os.path.exists(path):
+        raise ValueError("Invalid path for ableton project")
+    return last_modified
+
+
 def load_ableton_project(path: Path) -> tuple:
     # copy .als file, extract it and read
     if not os.path.exists(path):
         raise ValueError("Invalid path for ableton project")
-    last_modified = os.path.getmtime(path)
+    last_modified = get_last_modified(path)
     user_data = get_user_data_for_path(path)
     if user_data:
         user_data, _info_path = user_data
@@ -119,6 +133,8 @@ def load_ableton_project(path: Path) -> tuple:
             print(f"Reimporting changed project: {path}")
             logger.info(f"Reimporting changed project: {path}")
             tree, tree_path = full_als_import(path)
+            user_data["last_modified"] = last_modified
+            upsert_user_data(path, last_modified, tree_path)
         else:
             print(f"Loading project from cache: {path}")
             logger.info(f"Loading project from cache: {path}")

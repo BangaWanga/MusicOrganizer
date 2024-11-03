@@ -1,5 +1,6 @@
 from __future__ import annotations
 import dataclasses
+import datetime
 import enum
 import pathlib
 import typing
@@ -10,6 +11,7 @@ import flask
 import math
 from htmx_model import AbletonProject, AbletonTrack
 TMP_DIR = "tmp"
+import shutil
 
 
 class TrackType(enum.Enum):
@@ -66,84 +68,11 @@ class ProjectInfoXML:
         self.master_track = root.find(".//MasterTrack")
         self.project = root.find(".//Ableton")
 
-    def build_tracks_args(self):
+    def build_tracks_args(self) -> list[AbletonTrack]:
         _tracks = self.track_infos
         _tracks.append(self.build_master_track_info())
-        print(_tracks)
+        # print(_tracks)
         return _tracks
-
-    def build_render_info(self):
-        _rows = [self.make_render_info(self.project, idx=0, has_children=True, depth=0, parent=None),
-                 self.make_render_info(element=self.tracks, idx=1, has_children=len(self.track_infos) > 0, depth=1,
-                                       parent=0)]
-        depth = 2
-        for track_idx, track_info in enumerate(self.track_infos):
-            has_children = track_info.get("track_type",
-                                          "") == "GroupTrack"  # any([track["parent_group_id"] for track in self.track_infos])
-            self.track_infos[track_idx]["has_children"] = has_children
-            parent = track_info.get("parent_group_id", None)
-            if parent is not None:
-                print("parent! ", parent)
-        for track_idx, track_info in enumerate(self.track_infos):
-
-            _rows.append(
-                self.make_render_info(element=track_info, idx=len(_rows), has_children=track_info["has_children"],
-                                      depth=2, parent=1))
-
-        _rows.append(self.make_render_info(self.build_master_track_info(), idx=len(_rows), depth=1, parent=0,
-                                           has_children=False))
-        return _rows
-
-    @staticmethod
-    def make_render_info(element: typing.Union[dict, ET.Element, AbletonProjectClass], idx: int, has_children: bool,
-                         depth: int, parent: typing.Optional[int]):
-        return ProjectInfoXML._make_render_info(element, idx, has_children, depth, parent)
-
-    @staticmethod
-    def _make_render_info(element: typing.Union[dict, ET.Element, AbletonProjectClass], idx: int, has_children: bool,
-                          depth: int, parent: typing.Optional[int]):
-        is_dict = isinstance(element, dict)
-        print("is_dict", is_dict)
-        additional_data = None
-        color = None
-        plug_ins = None
-        if is_dict:
-            def unpack(key, val):
-                if isinstance(val, list):
-                    # print(key, [(i.attrib, i, ) for _idx, i in enumerate(val)])
-                    return {_idx: i.attrib["Value"] for _idx, i in enumerate(val)}
-                # print("Unpack value: ", val, key)
-                return val.attrib["Value"]
-
-            tag = element["tag"]
-            additional_data = element.get("additional_data", [])
-            plug_ins = element.get("plug_ins", [])
-            # print("plug_ins: ", plug_ins)
-            color = element.get("color", None)
-            track_type = element.get("track_type", None)
-            track_id = element.get("track_id", None)
-            if isinstance(color, ET.Element):
-                color = color.attrib["Value"]
-            value = {key: unpack(key, elem) for key, elem in element.items() if
-                     key not in {"tag", "additional_data", "color", "name", "plug_ins", "track_type", "track_id", "has_children"}}
-            value.update({
-                "track_type": track_type,
-                "track_id": track_id
-            })
-        else:
-            value = element.attrib
-            tag = element.tag
-        return {
-            "value": value,
-            "idx": idx,
-            "has_children": has_children,
-            "depth": depth,
-            "parent": parent,
-            "tag": tag,
-            "additional_data": additional_data,
-            "color": color,
-            "plug_ins": plug_ins,
-        }
 
     @staticmethod
     def extract_plugin_info(node: ET.Element):
@@ -157,18 +86,17 @@ class ProjectInfoXML:
                 "vst_version": vst_version.attrib["Value"],
                 "name": plug_name.attrib["Value"],
                 "path": plug_path.attrib["Value"]
-            }
-            )
+            })
         return relevant_infos
 
     def build_master_track_info(self):
         master_track: ET.Element = self.master_track
         master_envelopes = master_track.findall("AutomationEnvelopes/Envelopes/AutomationEnvelope")
+        bpm = None
         bpm_envelope = list(
             # ToDo: Find out why it's a different key in Dex-File. maybe because it is from an older version? -> Indicator for UI
             filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='8']") is not None else False,
                    master_envelopes))
-        print(bpm_envelope)
         if not bpm_envelope:
             bpm_envelope = list(  # Fix for Dex-File
                 filter(lambda env: True if env.find("EnvelopeTarget/PointeeId[@Value='497']") is not None else False,
@@ -178,16 +106,14 @@ class ProjectInfoXML:
             bpm_events: list = bpm_envelope.findall("Automation/Events/FloatEvent")
             apcs = [FloatEvent(elem) for elem in bpm_events]
             if len(apcs) > 1 or not apcs:
-                raise ValueError("multiple bpms or no bpm")
-            bpm = apcs[0]
+                pass
+                # raise ValueError("multiple bpms or no bpm")
+            else:
+                bpm = apcs[0]
         else:
             raise ValueError("No BPM FOUND")
-        return AbletonTrack(None, "Master", "MasterTrack", -1, "#000000", 0., .5, 1., self.extract_plugin_info(master_track), "")
-
-        return {
-            "bpm": bpm,
-            "tag": "Master Track"
-        }
+        plug_ins = self.extract_plugin_info(master_track)
+        return AbletonTrack(None, "Master", "MasterTrack", -1, "#000000", 0., bpm,  .5, 1., plug_ins, "", True)
 
     def render_fader(self, value: float, min_val: float, max_val: float, tag: str, sideways=True):
         offset = (50, 50,)
@@ -204,7 +130,7 @@ class ProjectInfoXML:
         line_pos1 = (int(offset[0] + r * math.cos(a)), int(offset[1] + r * math.sin(a)),)
         return flask.render_template("poti.html", line_pos0=line_pos0, line_pos1=line_pos1, radius=r, value=value)
 
-    def build_track_info(self, track: ET.Element):
+    def build_track_info(self, track: ET.Element) -> AbletonTrack:
         track_delay = int(track.find("TrackDelay/Value").attrib["Value"])  # has .attrib["Value"]
         # print("track_delay.attrib: ", track_delay.attrib)
         name = track.find("Name/EffectiveName").attrib["Value"]
@@ -217,27 +143,12 @@ class ProjectInfoXML:
         audio_output_routing = track.find("DeviceChain/AudioOutputRouting/Target").attrib["Value"]
         track_type = track.tag
         track_id = int(track.attrib["Id"])
-        print(track, track.tag, track.attrib)
+        # print(track, track.tag, track.attrib)
         # ToDo: Extract value right here
         # Create some visual representations and store as <additional_data> to include it as rendered html
         # additional_data = [self.render_fader(value=float(pan.attrib["Value"]), min_val=-1., max_val=1, tag="Pan")]
-
-        return AbletonTrack(track_id, name, track_type, parent_group_id, color, track_delay, pan, volume, self.extract_plugin_info(track), audio_output_routing)
-        return {
-            "track_delay": track_delay.attrib["Value"],
-            "name": name.attrib["Value"],
-            "color": color.attrib["Value"],
-            "pan": pan.attrib["Value"],
-            # "sends": sends,
-            "volume": volume.attrib["Value"],
-            "audio_output_routing": audio_output_routing.attrib["Value"],
-            "parent_group_id": parent_group_id.attrib["Value"],
-            "tag": name.attrib["Value"],
-            "additional_data": additional_data,
-            "plug_ins": self.extract_plugin_info(track),
-            "track_type": track_type,
-            "track_id": track_id
-        }
+        is_visible = parent_group_id == -1
+        return AbletonTrack(track_id, name, track_type, parent_group_id, color, track_delay, None, pan, volume, self.extract_plugin_info(track), audio_output_routing, is_visible)
 
 
 class NestedTable:
@@ -443,9 +354,30 @@ class Ableton_Project:
         self.root = None
         # self.scan_project_dir()
         self.is_loaded = False
+        self.is_cached = False
+        self.last_modified: typing.Optional[datetime.datetime] = None
+        from files import get_user_data_for_path
+        self.meta = {"contains_vst2": None}  # messages that may be shown in project overview
+        user_data = get_user_data_for_path(project_path)
+        self.project_info: ProjectInfoXML = None
+        if user_data:
+            project_info, _project_info_path = user_data
+            self.is_cached = True
+            self.last_modified = project_info["last_modified"]
+
+    def update_contains_vst2(self, plug_ins: list[dict]):
+        versions = [plug["vst_version"] for plug in plug_ins]
+        contains_vst2 = any([v.startswith("2") for v in versions])
+        self.meta["contains_vst2"] = contains_vst2 or self.meta["contains_vst2"]
+    @property
+    def model(self):
+        last_modified = self.last_modified
+        if last_modified:
+            last_modified = last_modified.strftime("%Y-%m-%d %H:%M:%S")
+        return AbletonProject(str(self.project_path), last_modified, self.is_loaded, self.is_cached, self.meta)
 
     def build_project_info_object(self) -> ProjectInfoXML:
-        return ProjectInfoXML(self.root)
+        self.project_info = ProjectInfoXML(self.root)
 
     def __str__(self):
         return f"\nAbletonProject\nproj-path: {self.project_path}\nexports: {self.exports}\nproj-files: {self.project_files}"
@@ -475,7 +407,6 @@ class Ableton_Project:
 
         return True
         # copy .als file, extract it and read
-        import shutil
         tmp_path = pathlib.Path(TMP_DIR).joinpath(
             str(path.stem) + "-tmp" + ".gz"  # str(path.stem)[-len(path.suffix):]
         )

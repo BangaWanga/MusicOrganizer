@@ -1,21 +1,36 @@
 
-
+<button hx-get="/load-selected-projects" hx-indicator="#spinner">
+    Ausgewählte Dateien laden
+</button>
 <table>
     <thead>
-        <tr>
-            {% for head in header %}
-                <td>{{ head }}</td>
-            {% endfor %}
-        </tr>
+    <tr>
+        <td>Dateipfad</td>
+        <td>Letzte Änderung</td>
+        <td>Datei ist geladen</td>
+        <td>Datei ist im Zwischenspeicher</td>
+        <td>Warnungen</td>
+        <td>Datei zum Laden auswählen</td>
+    </tr>
     </thead>
     <tbody>
-        {% for track in tracks %}
-                <tr class="track-info ">
-                    {% for project in ableton_projects %}
-                        <td >{{ project[head] }} </td>
-                    {% endfor %}
-                </tr>
-        {% endfor %}
+    {% for project in ableton_projects %}
+        {% set proj_idx = loop.index0 %}
+        <tr class="track-info" hx-get="/project_table?project_id={{ proj_idx }}" hx-target="#project-table" hx-swap="innerHTML" hx-push-url="true">
+
+            <td>{{ project.project_path }}</td>
+            <td>{{ project.last_modified }}</td>
+            <td>{{ project.is_loaded }}</td>
+            <td>{{ project.is_cached }}</td>
+            <td >
+                {% if project.meta.contains_vst2 %}
+                    <span title="Project contains VST2" style="background-color: red"> ⚠</span>
+                {% else %}
+                {% endif %}
+            </td>
+            <td> <input type="checkbox"> </td>
+        </tr>
+    {% endfor %}
     </tbody>
 </table>
 

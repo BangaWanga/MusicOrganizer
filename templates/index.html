@@ -70,8 +70,10 @@
         htmx.swap('#info-box', text, {swapStyle: 'innerHTML'})
     }
 
+
+
 </script>
-<body>
+<span>
 
 <style>
     .GroupTrack {
@@ -89,12 +91,23 @@
 
 </style>
 
-<a href="/" class="button" id="home-btn">
+<button class="button" hx-on:click="home()">
     <span><h3>HOME</h3></span>
-</a>
-<button hx-get="/toggle_table_mode" hx-swap="none" class="button" id="home-btn">
-    <span><h3>Toggle Table Mode</h3></span>
 </button>
+
+<script>
+    reload = function () {
+        window.location.href = "/reload"
+    }
+    home = function(){
+        window.location.href = "/"
+    }
+    let selectedFiles = [];
+</script>
+<button class="button" hx-on:click="reload()">
+    <span> <h3>⟳</h3></span>
+</button>
+
 
 <div id="new-project-picker">
 
@@ -108,12 +121,13 @@
     <ul id="new-file-path-list">
 
     </ul>
+<span  id="spinner" class="htmx-indicator" style="position: absolute"> HELLO WORLD </span>
 </div>
 <span id="textArea">
 
 </span>
 
-<div class="project-table">
+<div class="project-table" id="project-table">
     {{ table_template | safe }}
 </div>
 <ul id="bookmarks"
@@ -126,7 +140,7 @@
 </div>
 </body>
 <style>
-    #home-btn {
+    .button {
         min-width: 5em;
         max-width: 5em;
         background-color: rgb(206, 224, 232);

@@ -149,7 +149,8 @@ class ProjectInfoXML:
         # Create some visual representations and store as <additional_data> to include it as rendered html
         # additional_data = [self.render_fader(value=float(pan.attrib["Value"]), min_val=-1., max_val=1, tag="Pan")]
         is_visible = parent_group_id == -1
-        return AbletonTrack(track_id, name, track_type, parent_group_id, color, track_delay, None, pan, volume, self.extract_plugin_info(track), audio_output_routing, is_visible)
+        return AbletonTrack(track_id, name, track_type, parent_group_id, color, track_delay, None, pan, volume,
+                            self.extract_plugin_info(track), audio_output_routing, is_visible)
 
 
 class NestedTable:
@@ -261,7 +262,6 @@ class NestedTable:
         self._new_rows = _new_rows
         self.visible_rows.extend(indices)
         return list(reversed(row_path))
-
 
     def test_table(self):
         for row_idx, row in enumerate(self.rows):

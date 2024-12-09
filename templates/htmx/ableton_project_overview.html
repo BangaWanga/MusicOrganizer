@@ -16,9 +16,10 @@
     <tbody>
     {% for project in ableton_projects %}
         {% set proj_idx = loop.index0 %}
-        <tr class="track-info" hx-get="/project_table?project_id={{ proj_idx }}" hx-target="#project-table" hx-swap="innerHTML" hx-push-url="true">
+        <tr class="project-info" hx-get="/project_table?project_id={{ proj_idx }}" hx-target="#project-table"
+            hx-swap="innerHTML" hx-push-url="true" hx-indicator="#spinner">
 
-            <td>{{ project.project_path }}</td>
+        <td>{{ project.project_path }}</td>
             <td>{{ project.last_modified }}</td>
             <td>{{ project.is_loaded }}</td>
             <td>{{ project.is_cached }}</td>

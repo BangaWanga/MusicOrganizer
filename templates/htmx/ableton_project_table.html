@@ -1,22 +1,23 @@
+<div id="ableton-project-table">
 
-
-<table id="ableton-project-table">
-    <thead>
-        <tr>
-            <td>Name</td>
-            <td>Typ</td>
-            <td>Pan</td>
-            <td>Volume</td>
-            <td>Plug-Ins</td>
-        </tr>
-    </thead>
-    <tbody>
-        {% for track in tracks %}
+    <div id="theRealTable">
+        <table>
+            <thead>
+            <tr>
+                <td>Name</td>
+                <td>Typ</td>
+                <td>Pan</td>
+                <td>Volume</td>
+                <td>Plug-Ins</td>
+            </tr>
+            </thead>
+            <tbody>
+            {% for track in tracks %}
                 <tr class="track-info ableton-col-{{ track.color }} {{ track.track_type }}"
-                {% if not track.is_visible %} style="visibility: collapse;"{% endif %}
-                hx-get="/toggle-group-track?track_id={{ track.track_id }}&project_idx={{ project_idx }}"
+                        {% if not track.is_visible %} style="visibility: collapse;"{% endif %}
+                    hx-get="/toggle-group-track?track_id={{ track.track_id }}&project_idx={{ project_idx }}"
                     hx-target="#ableton-project-table"
-                hx-swap="outerHTML"
+                    hx-swap="outerHTML"
                 >
                     <td>{{ track.name }} </td>
                     <td>{{ track.track_type }} </td>
@@ -25,22 +26,37 @@
                     <td>
                         <ul>
                             {% for plug_in in track.plug_ins %}
-                            <li title="{{ plug_in.path }}">{{ plug_in.name }} - vst-version: {{ plug_in.vst_version }} </li>
+                                <li {% if plug_in.vst_version[0] == "2" %}
+                                    style="background-color: #d931ff !important;" {% endif %}
+                                    title="{{ plug_in.path }} - version {{ plug_in.vst_version }}">{{ plug_in.name }} -
+                                </li>
+                                {#
+
+                                <li title="{{ plug_in.path }}">{{ plug_in.name }} -
+                                    vst-version: {{ plug_in.vst_version }} </li>
+                                #}
+
                             {% endfor %}
                         </ul>
                     </td>
                 </tr>
-        {% endfor %}
-    </tbody>
-</table>
+            {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+
+    <div class="NoteBook" style="width: 50%;">
+        <input type="text"
+               style="width:80%; height:10em; text-align: center; margin-top: 10em; margin-left: 3em; margin-right: 5em; box-sizing: border-box;"
+               placeholder="...">
+    </div>
+</div>
+
 
 <style>
 
-th, td {
-  border: 1px solid #a1fffd;
-  border-radius: 5px;
-}
 
-    .track-info{
+    .track-info {
     }
 </style>

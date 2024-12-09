@@ -73,10 +73,12 @@
 
 
 </script>
-<span>
 
 <style>
     .GroupTrack:hover {
+        background-color: chocolate;
+    }
+    .project-info:hover{
         background-color: chocolate;
     }
 
@@ -91,6 +93,9 @@
 #}
 
 </style>
+<div id="spinner" class="htmx-indicator"
+     style="position: absolute; width: 100%; height: 100%; pointer-events: none; color: firebrick; background-color: #b6b6b6; text-align: center">
+    <h1 class="my-indicator"> LOADING... </h1></div>
 
 <button class="button" hx-on:click="home()">
     <span><h3>HOME</h3></span>
@@ -122,7 +127,6 @@
     <ul id="new-file-path-list">
 
     </ul>
-<span  id="spinner" class="htmx-indicator" style="position: absolute"> HELLO WORLD </span>
 </div>
 <span id="textArea">
 
@@ -141,6 +145,9 @@
 </div>
 </body>
 <style>
+    .htmx-request .my-indicator{
+        opacity:0.5;
+    }
     .button {
         min-width: 5em;
         max-width: 5em;
@@ -171,12 +178,20 @@
         background-size: 900px;
     }
 
-    th, td {
+    th, tr {
       border: 1px solid #a1fffd;
       border-radius: 5px;
     }
 
-
+    #ableton-project-table{
+        display: flex;
+    }
+    #NoteBook {
+        width: 50%;
+    }
+    #theRealTable{
+        width: 50%;
+    }
 </style>
 
 

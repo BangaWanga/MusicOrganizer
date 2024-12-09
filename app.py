@@ -179,6 +179,7 @@ def bookmark():
 
     return render_template("bookmark.html", tag=tag, row=row, value=value)
 
+
 @app.route("/midi_device", methods=["GET"])
 def midi_device():
     global midi_port, port

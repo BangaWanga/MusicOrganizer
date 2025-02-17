@@ -35,13 +35,12 @@ def init(): # ToDo Maybe call with import? Or move to directory and call in __in
     if not os.path.exists(USER_DATA):
         os.mkdir(USER_DATA)
     if not os.path.exists(LINKED_PROJECTS):
-        global linked_projects
-        pickle.dump(linked_projects, open(LINKED_PROJECTS, "wb"))
+        pickle.dump({}, open(LINKED_PROJECTS, "wb"))
     if os.path.exists(PROJECT_FILES_PATH_PATH):
         PROJECT_FILES_PATH = pickle.load(open(PROJECT_FILES_PATH_PATH, "rb"))
         print("Replaced default project path with ", PROJECT_FILES_PATH_PATH, PROJECT_FILES_PATH)
     else:
-        print("Strange, ", PROJECT_FILES_PATH_PATH)
+        print("No user project path provided, ", PROJECT_FILES_PATH_PATH)
     load_linked_projects()
     print("Init Files DONE")
 
@@ -60,6 +59,7 @@ def get_project_paths(file_path: str = None, exclude_directories=("Backup", )):
     global PROJECT_FILES_PATH
     if file_path is None:
         file_path = PROJECT_FILES_PATH
+    print("CALLED GET PROJECT PATHS ", file_path )
     # ToDo: Preserve directory structure from original directory
     ret = []
     for directory in Path(file_path).glob('**'):
@@ -74,7 +74,7 @@ def get_project_paths(file_path: str = None, exclude_directories=("Backup", )):
 
 def get_user_data_for_path(path: Path) -> typing.Optional[typing.Tuple[dict, Path]]:
     global linked_projects
-
+    # TODO: load from RAM if possible
     # print("linked_projects: ", linked_projects)
     info_path = linked_projects.get(path)
     if info_path:
@@ -105,7 +105,7 @@ def upsert_user_data(project_path: Path, last_modified: float, tree_path: Path, 
     save_linked_projects()
 
 
-def get_last_modified(path)-> float:
+def get_last_modified(path) -> float:
     file_stat = os.stat(path)
     last_modified = datetime.datetime.fromtimestamp(file_stat.st_mtime)
     last_access = datetime.datetime.fromtimestamp(file_stat.st_atime)

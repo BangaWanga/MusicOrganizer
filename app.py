@@ -11,6 +11,7 @@ from htmx_model import AbletonProjectTable, AbletonProject, AbletonProjectOvervi
 
 from ableton import Ableton_Project, NestedTable, ProjectInfoXML
 from flask_socketio import SocketIO, emit
+import webbrowser
 app = Flask(__name__)
 Cors = CORS(app)
 CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS=True)
@@ -39,12 +40,18 @@ if ENABLE_MIDI:
     midi_port: Midi_Port = typing.Optional[None]
 port = None
 current_table: typing.Optional[int] = None
-file_pick_thread = None
+file_pick_proc = None
+
+
+webbrowser.open("http://localhost:5000")
+
 
 def load_projects():
     print("LOAD ABLETON PROJECTS")
-    global ableton_projects
+    global ableton_projects, project_paths
+    ableton_projects = []
     for path in project_paths:
+        print(path)
         ableton_projects.append(Ableton_Project(path))
 
 
@@ -52,17 +59,27 @@ load_projects()
 import tkinter as tk
 from tkinter import filedialog
 
+def reload_projects():
+    global project_paths, current_table, nested_tables
+    current_table = None
+    nested_tables = dict()
+    print("RELOAD PROJECTS")
+    project_paths = get_project_paths()
+    load_projects()
+    #  load_projects()
 
 def OpenFileDialog():
     root = tk.Tk()
     root.withdraw()
     root.focus_set()
     file_path = filedialog.askdirectory()
-    set_project_path(file_path)
-
+    if file_path:
+        set_project_path(file_path)
+    else:
+        print("nofp")
 
 @app.route('/reload')
-def reload_projects():
+def reload_projects_endpoint():
     load_projects()
     return flask.redirect("/")
 
@@ -88,6 +105,7 @@ def project_search(search_word: str = "", project_id: int = None):
     rows = project.rec_search(search_word=search_word, search_for_occurence=True)
     return rows
 
+
 def load_all_projects():
     for project_idx in range(len(ableton_projects)):
         try:
@@ -112,7 +130,9 @@ def get_project(project_id: int) -> Ableton_Project:
 @app.route("/load-selected-projects", methods=["GET"])
 def load_selected_projects():
     load_all_projects()
-    return flask.redirect("/")
+    resp = flask.make_response("status: ok")
+    resp.headers["HX-Refresh"] = "true"
+    return resp
 
 
 @app.route("/toggle_table_mode", methods=["GET"])
@@ -270,14 +290,21 @@ def get_projects():
     return response_object
 
 
-@app.route('/project_paths', methods=["GET"])
+@app.route('/project_paths', methods=["GET",  "POST"])
 def add_project_paths():
     # print("add_project_paths ", request.is_json, request.args, request.data, request.files)
     import multiprocessing
-    global file_pick_thread
-    file_pick_thread = multiprocessing.Process(target=OpenFileDialog, args=tuple())
-    file_pick_thread.start()
-    return flask.render_template("project_selection.html", )
+    global file_pick_proc
+    file_pick_proc = multiprocessing.Process(target=OpenFileDialog, args=tuple())
+    file_pick_proc.start()
+    file_pick_proc.join()
+    print("After JOIN")
+    init()
+    reload_projects()
+    resp = flask.make_response("status: ok")
+    resp.headers["HX-Refresh"] = "true"
+    return resp
+    # return flask.render_template("project_selection.html", )
 
 
 @app.route('/')
@@ -285,11 +312,12 @@ def index():  # put application's code here
     # load_projects()
     global ableton_projects, nested_tables
     nt_id = len(nested_tables)
+    # print("OUR BASE: ", ableton_projects)
     nt = NestedTable.from_ableton_project_list(ableton_projects, page_link="project_table", nested_table_id=nt_id)
     nested_tables[nt_id] = nt
     proj_tables = []
     for project in ableton_projects:
-        if project.is_loaded:   # ToDo: Handle if not loaded? Maybe load all projects on load? Maybe some picked ones?
+        if project.is_loaded:
             project.build_project_info_object()
             # print("project_info.build_tracks_args(): ", project_info.build_tracks_args())
             tracks = project.project_info.build_tracks_args()
@@ -329,5 +357,7 @@ def index():  # put application's code here
 
 
 if __name__ == '__main__':
-    print("Sock")
+
+    print("WOOP Quadrat")
     socketio.run(app)
+

@@ -6,6 +6,8 @@
     <script src="https://unpkg.com/htmx.org@2.0.3"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/multi-swap.js"></script>
     <!--<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>-->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="{{ url_for('static', filename='ableton_colors.css') }}">
 </head>
 
@@ -70,84 +72,107 @@
         htmx.swap('#info-box', text, {swapStyle: 'innerHTML'})
     }
 
-
-
+    reload = function () {
+        window.location.href = "/reload"
+    }
+    home = function () {
+        window.location.href = "/"
+    }
+    let selectedFiles = [];
 </script>
 
 <style>
     .GroupTrack:hover {
         background-color: chocolate;
     }
-    .project-info:hover{
+
+    .project-info:hover {
         background-color: chocolate;
     }
 
-{#
-    .MidiTrack {
-        background-color: antiquewhite;
-    }
+    {#
+        .MidiTrack {
+            background-color: antiquewhite;
+        }
 
-    .AudioTrack {
-        background-color: firebrick;
-    }
-#}
+        .AudioTrack {
+            background-color: firebrick;
+        }
+    #}
 
 </style>
+
 <div id="spinner" class="htmx-indicator"
      style="position: absolute; width: 100%; height: 100%; pointer-events: none; color: firebrick; background-color: #b6b6b6; text-align: center">
     <h1 class="my-indicator"> LOADING... </h1></div>
 
-<button class="button" hx-on:click="home()">
-    <span><h3>HOME</h3></span>
-</button>
+<div class="card">
+    <div class="card-body" style="max-width: 25%; padding-left: 60px;">
+        <div class="row">
+            <div class="col-md">
+                <button class="button" hx-on:click="home()" hx-indicator="#spinner">
+                    <span>HOME</span>
+                </button>
+            </div>
+            <div class="col-md">
+                <button class="button" hx-on:click="reload()" hx-indicator="#spinner">
+                    <span>⟳</span>
+                </button>
+            </div>
+        </div>
 
-<script>
-    reload = function () {
-        window.location.href = "/reload"
-    }
-    home = function(){
-        window.location.href = "/"
-    }
-    let selectedFiles = [];
-</script>
-<button class="button" hx-on:click="reload()">
-    <span> <h3>⟳</h3></span>
-</button>
-
-
-<div id="new-project-picker">
-
-    <label for="new-project-path"></label>
-    <form
-            hx-on:change="add_project_paths(event);htmx.ajax('POST', '/project_paths', {'swap': 'innerHTML', 'target': '#new-file-path-list', 'values':{'paths': get_project_paths(event)}})">
-        <input id="new-project-path" name="files" type="file" webkitdirectory multiple/>
-        <input id="submit-new-project-paths" type="submit"/>
-    </form>
-    <button hx-get="/project_paths" hx-swap="none">New project directory</button>
-    <ul id="new-file-path-list">
-
-    </ul>
+    </div>
 </div>
-<span id="textArea">
 
-</span>
 
-<div class="project-table" id="project-table">
-    {{ table_template | safe }}
+<div id="new-project-picker" class="card" style="padding: 60px;">
+    <div class="card-header">
+        Projektübersicht
+    </div>
+    <div class="card-body">
+
+        <label for="new-project-path"></label>
+        {#
+        <form hx-on:change="add_project_paths(event);htmx.ajax('POST', '/project_paths',
+            {'swap': 'innerHTML', 'target': '#new-file-path-list', 'values':{'paths': get_project_paths(event)}})">
+
+            <input id="new-project-path" name="files" type="file" webkitdirectory multiple/>
+            <input id="submit-new-project-paths" type="submit"/>
+        </form>
+        #}
+        <button class="button" hx-get="/project_paths" hx-swap="none" hx-indicator="#spinner"
+                title="Sets a new source directory to load new projects from">Set source directory
+        </button>
+        <ul id="new-file-path-list">
+
+        </ul>
+        <span id="textArea">
+
+        </span>
+
+        <div class="project-table" id="project-table">
+            {{ table_template | safe }}
+        </div>
+        <ul id="bookmarks"
+            hx-on::beforeSwap="console.log('WORKS', this, event)"
+        >
+
+        </ul>
+        <div id="info-box">
+
+        </div>
+
+    </div>
+
 </div>
-<ul id="bookmarks"
-    hx-on::beforeSwap="console.log('WORKS', this, event)"
->
 
-</ul>
-<div id="info-box">
 
-</div>
 </body>
 <style>
-    .htmx-request .my-indicator{
-        opacity:0.5;
+    .htmx-request .my-indicator {
+        opacity: 0.5;
     }
+
     .button {
         min-width: 5em;
         max-width: 5em;
@@ -157,8 +182,7 @@
 
     .project-table {
         display: block;
-        {#background: rgba(168, 185, 199, 0.98);#}
-        backdrop-filter: blur(10px);
+    {#background: rgba(168, 185, 199, 0.98);#} backdrop-filter: blur(10px);
     }
 
     #info-box {
@@ -173,23 +197,25 @@
         max-width: 10em;
         overflow: auto;
     }
+
     body {
-        {#background-image: url('static/img/background.png');#}
-        background-size: 900px;
+    {#background-image: url('static/img/background.png');#} background-size: 900px;
     }
 
     th, tr {
-      border: 1px solid #a1fffd;
-      border-radius: 5px;
+        border: 1px solid #a1fffd;
+        border-radius: 5px;
     }
 
-    #ableton-project-table{
+    #ableton-project-table {
         display: flex;
     }
+
     #NoteBook {
         width: 50%;
     }
-    #theRealTable{
+
+    #theRealTable {
         width: 50%;
     }
 </style>

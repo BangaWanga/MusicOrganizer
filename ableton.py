@@ -374,6 +374,8 @@ class Ableton_Project:
     def model(self):
         last_modified = self.last_modified
         if last_modified:
+            if isinstance(last_modified, float):
+                last_modified = datetime.datetime.fromtimestamp(last_modified )
             last_modified = last_modified.strftime("%Y-%m-%d %H:%M:%S")
         return AbletonProject(str(self.project_path), last_modified, self.is_loaded, self.is_cached, self.meta)
 

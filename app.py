@@ -10,22 +10,16 @@ import time
 from htmx_model import AbletonProjectTable, AbletonProject, AbletonProjectOverview
 
 from ableton import Ableton_Project, NestedTable, ProjectInfoXML
-from flask_socketio import SocketIO, emit
 import webbrowser
 app = Flask(__name__)
 Cors = CORS(app)
 CORS(app, resources={r'/*': {'origins': '*'}}, CORS_SUPPORTS_CREDENTIALS=True)
 
 app.config['CORS_HEADERS'] = 'Content-Type'
-socketio = SocketIO(app)
 init()
 
-XML_MODE = False
 project_table_url = "/project_table"
 project_table_xml_url = "/project_table_xml"
-if XML_MODE:
-    project_table_url = "/project_table_"
-    project_table_xml_url = "/project_table"
 
 visible_rows = []
 ableton_projects: list[Ableton_Project] = []
@@ -33,11 +27,8 @@ ableton_projects: list[Ableton_Project] = []
 project_paths: list[pathlib.Path] = get_project_paths()
 nested_tables: dict[int, NestedTable] = dict()
 bookmarks = set()
-ENABLE_MIDI = False
-if ENABLE_MIDI:
-    from midi import get_midi_outs, Midi_Port, MIDI_Signal, MIDI_Type
 
-    midi_port: Midi_Port = typing.Optional[None]
+
 port = None
 current_table: typing.Optional[int] = None
 file_pick_proc = None
@@ -200,21 +191,6 @@ def bookmark():
     return render_template("bookmark.html", tag=tag, row=row, value=value)
 
 
-@app.route("/midi_device", methods=["GET"])
-def midi_device():
-    global midi_port, port
-    _port = request.args.get('port', None)
-    assert _port and _port.isnumeric()
-    if port is None or port != _port:
-        port = int(_port)
-        midi_port = Midi_Port(port)
-    return flask.render_template("midi_device.html", name=get_midi_outs()[port])
-
-
-@app.route("/midi_devices", methods=["GET"])
-def midi_devices():
-    return flask.render_template("midi_devices.html", midi_outs=get_midi_outs())
-
 
 @app.route(project_table_url, methods=["GET"])
 def project_table_new():
@@ -261,7 +237,6 @@ def toggle_row():
     nt = nested_tables[project_id]
     is_expanded = nt.toggle_row(row_idx)
     row_group = nt.build_new_row_group(row_idx)
-    # print(f"is_expanded: {is_expanded}. Added rows for row {row_idx}: {len(row_group)}", )
     return row_group
 
 
@@ -286,7 +261,6 @@ def get_project_search():
 @cross_origin(supports_credentials=True)
 def get_projects():
     response_object = {'status': 'success', "projects": [parse_str(project_paths)]}
-    print("WOOP Quadrat")
     return response_object
 
 
@@ -304,7 +278,6 @@ def add_project_paths():
     resp = flask.make_response("status: ok")
     resp.headers["HX-Refresh"] = "true"
     return resp
-    # return flask.render_template("project_selection.html", )
 
 
 @app.route('/')
@@ -326,38 +299,7 @@ def index():  # put application's code here
         proj_tables.append(project.model)   # AbletonProject(str(project.project_path), project.last_modified, project.is_loaded, project.is_cached))
     proj_overview_table = AbletonProjectOverview(ableton_projects=proj_tables)
     table_template = proj_overview_table.render()
-    # print(proj_tables)
-    # print("table_template: ", table_template)
     return render_template("index.html", paths=project_paths, table_template=table_template)
 
 
-
-# @app.route("/send_midi_signal", methods=["Get", "POST"])
-# @cross_origin(headers=['Content-Type'])
-# def send_midi_signal():
-#     global midi_port
-#     print("Sending Tone ", request.args, request.form, request.values)
-#     note = request.form.get("note", None)
-#     velocity = request.form.get("velocity", None)
-#     assert note is not None and note.isnumeric()
-#     assert velocity is not None and velocity.isnumeric()
-#     note, velocity = int(note), int(velocity)
-#     assert 0 < note < 128
-#     assert 0 < velocity < 128
-#
-#     channel = 0
-#     note_on = MIDI_Type.Note_On(channel, note, velocity)
-#     note_off = MIDI_Type.Note_Off(channel, note, velocity)
-#     midi_port.send(note_on, )
-#     time.sleep(0.5)
-#     midi_port.send(note_off,)
-#     return {"status": 200}
-#
-
-
-
-if __name__ == '__main__':
-
-    print("WOOP Quadrat")
-    socketio.run(app)
 
